@@ -447,6 +447,12 @@
       return Math.min(max, Math.max(min, n));
     }
 
+    function loadBpm(raw) {
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 40 || n > 300) return 60;
+      return Math.round(n);
+    }
+
     function keepFutureOnly() {
       if (!audioCtx) {
         scheduled = [];
@@ -1044,8 +1050,7 @@
       trainTargetEl.value = String(trainTarget);
       trainBarsEl.value = String(trainBars);
       trainStepEl.value = String(trainStep);
-      const n = Number(savedBpm);
-      const initial = trainerOn ? trainStart : (Number.isFinite(n) ? n : 60);
+      const initial = trainerOn ? loadBpm(trainStart) : loadBpm(savedBpm);
       bpm = initial;
       gridBpm = initial;
       showBpm(initial);
