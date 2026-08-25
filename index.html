@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>click2</title>
+  <style>
+    body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+      font-family:Segoe UI,sans-serif; background:#111; color:#fff; }
+    .wrap { width:min(520px,96vw); text-align:center; }
+    .logo {
+      position:fixed;
+      top:18px;
+      left:22px;
+      margin:0;
+      font-size:42px;
+      font-weight:800;
+      letter-spacing:-0.04em;
+      color:#2ec4d6;
+      line-height:1;
+    }
+    .bpm {
+      font-size:92px;
+      font-weight:700;
+      line-height:1;
+      width:100%;
+      border:0;
+      outline:none;
+      background:transparent;
+      color:#fff;
+      text-align:center;
+      font-family:inherit;
+      -moz-appearance:textfield;
+    }
+    .bpm::-webkit-outer-spin-button,
+    .bpm::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+    .label { color:#888; margin:8px 0 22px; }
+    .dots { display:flex; justify-content:center; align-items:center; gap:12px; margin-bottom:28px; min-height:48px; }
+    button { border:0; border-radius:12px; background:#2a2a2a; color:#fff;
+      font-size:18px; font-weight:600; padding:12px 18px; cursor:pointer; }
+    button.active { background:#2ec4d6; color:#111; }
+    button:disabled, input[type=range]:disabled, .bpm:read-only {
+      opacity:0.35;
+      cursor:default;
+    }
+    .dot {
+      width:48px;
+      height:48px;
+      padding:0;
+      min-width:48px;
+      min-height:48px;
+      border-radius:50%;
+      background:#333;
+      flex:0 0 auto;
+      font-size:0;
+      line-height:0;
+      box-shadow:none;
+    }
+    .dot.small {
+      width:24px;
+      height:24px;
+      min-width:24px;
+      min-height:24px;
+      background:#2a2a2a;
+    }
+    .dot.on { background:#2ec4d6; }
+    .dot.muted { background:#1a1a1a; box-shadow:inset 0 0 0 2px #555; }
+    .dot.muted.on { background:#164e56; box-shadow:inset 0 0 0 2px #2ec4d6; }
+    .play { width:100%; border-radius:999px; padding:16px; font-size:22px; background:#1f8a4c; }
+    .play.stop { background:#4a5d6e; }
+    .row { display:flex; justify-content:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+    input[type=range] { width:100%; }
+    select, .trainer-box input {
+      background:#2a2a2a;
+      color:#fff;
+      border:0;
+      border-radius:12px;
+      padding:8px 10px;
+      font-size:13px;
+    }
+    select { width:100%; }
+    .hint {
+      margin-top:22px;
+      color:#666;
+      font-size:12px;
+      white-space:nowrap;
+    }
+    .corner {
+      position:fixed;
+      top:50%;
+      right:16px;
+      transform:translateY(-50%);
+      display:flex;
+      flex-direction:column;
+      align-items:stretch;
+      gap:8px;
+      width:150px;
+    }
+    .dots-toggle, .mute-reset {
+      font-size:13px;
+      padding:8px 12px;
+      border-radius:999px;
+    }
+    .trainer-box {
+      position:fixed;
+      right:16px;
+      bottom:16px;
+      width:210px;
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:8px;
+      text-align:left;
+      color:#aaa;
+      font-size:13px;
+    }
+    .trainer-box .trainer-toggle {
+      grid-column:1 / -1;
+      border-radius:999px;
+      padding:8px 12px;
+      font-size:14px;
+    }
+    .trainer-box label { display:flex; flex-direction:column; gap:4px; }
+    .trainer-box input {
+      width:100%;
+      box-sizing:border-box;
+      -moz-appearance:textfield;
+    }
+    .trainer-box input::-webkit-outer-spin-button,
+    .trainer-box input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+    .trainer-status { grid-column:1 / -1; text-align:center; color:#666; min-height:16px; }
+  </style>
+</head>
+<body>
+  <h1 class="logo">click2</h1>
+  <div class="corner">
+    <button type="button" class="dots-toggle" id="dotsToggle" aria-pressed="false">sub dots</button>
+    <button type="button" class="mute-reset" id="muteReset">reset mutes</button>
+    <select id="sound" aria-label="click sound">
+      <option value="rim">rim</option>
+      <option value="wood">woodblock</option>
+      <option value="clave">clave</option>
+      <option value="soft">soft triangle</option>
+      <option value="sine">sine</option>
+      <option value="crisp">square</option>
+    </select>
+  </div>
+  <div class="trainer-box">
+    <button type="button" class="trainer-toggle" id="trainerBtn" aria-pressed="false">trainer</button>
+    <label>start bpm <input id="trainStart" type="number" min="40" max="300" value="60" inputmode="numeric"></label>
+    <label>target bpm <input id="trainTarget" type="number" min="40" max="300" value="100" inputmode="numeric"></label>
+    <label>bar interval <input id="trainBars" type="number" min="1" max="64" value="8" inputmode="numeric"></label>
+    <label>± bpm <input id="trainStep" type="number" min="1" max="32" value="4" inputmode="numeric"></label>
+    <div class="trainer-status" id="trainStatus"></div>
+  </div>
+  <div class="wrap">
+    <input class="bpm" id="bpmText" type="number" min="40" max="300" value="60" inputmode="numeric" autocomplete="off" aria-label="tempo in bpm" />
+    <div class="label">bpm</div>
+    <div class="dots" id="dots"></div>
+    <div class="row">
+      <button type="button" id="minus4">-4</button>
+      <button type="button" id="minus1">-1</button>
+      <button type="button" id="plus1">+1</button>
+      <button type="button" id="plus4">+4</button>
+    </div>
+    <div class="row">
+      <button type="button" id="quarter" aria-pressed="true">quarter</button>
+      <button type="button" id="eighth" aria-pressed="false">8th</button>
+      <button type="button" id="sixteenth" aria-pressed="false">16th</button>
+      <button type="button" id="swing" aria-pressed="false">swing</button>
+    </div>
+    <input id="slider" type="range" min="40" max="300" value="60" autocomplete="off" aria-label="tempo slider" />
+    <div class="row" style="margin-top:22px">
+      <button type="button" class="play" id="play">play</button>
+    </div>
+    <p class="hint">space = play/stop · up/down = ±1 · left/right = ±4 · click a dot to mute</p>
+  </div>
+  <script>
+    const LOOKAHEAD_MS = 25;
+    const SCHEDULE_AHEAD = 0.2;
+    const LATE_SLACK = 0.01;
+    const BOOK_SLACK = 0.008;
+    const CLICK_LEN = 0.035;
+    const BEAT_VOL = 0.7;
+    const SUB_VOL = 0.28;
+    const BPM_KEY = "click-metronome-bpm";
+    const SUB_KEY = "click-metronome-subdiv";
+    const SWING_KEY = "click-metronome-swing";
+    const DOTS_KEY = "click-metronome-extra-dots";
+    const MUTE_KEY = "click-metronome-mutes";
+    const SOUND_KEY = "click-metronome-sound";
+    const TRAIN_KEY = "click-metronome-trainer-v2";
+    const SOUND_OPTIONS = ["rim", "wood", "clave", "soft", "sine", "crisp"];
+
+    let bpm = 60;
+    let gridBpm = 60;
+    let gridSubdiv = 1;
+    let gridSwing = false;
+    let pendingBpm = null;
+    let pendingSubdiv = null;
+    let pendingSwing = null;
+    let changeQueued = false;
+    let holdBeat = null;
+    let extraDots = false;
+    let soundPreset = "rim";
+    let noiseBuf = null;
+    let mutes = {
+      1: [true, true, true, true],
+      2: [true, true, true, true, true, true, true, true],
+      4: Array(16).fill(true)
+    };
+
+    let trainerOn = false;
+    let trainStart = 60;
+    let trainTarget = 100;
+    let trainBars = 8;
+    let trainStep = 4;
+    let trainerRunning = false;
+    let trainerPhase = "out";
+    let trainerFirstBar = true;
+    let barsDone = 0;
+    let shownBpm = 60;
+    let shownBars = 0;
+    let shownPhase = "out";
+
+    let playing = false;
+    let starting = false;
+    let beat = 0;
+    let sub = 0;
+    let soundedBeatStart = 0;
+    let soundedBeatIndex = 0;
+    let schedBeatStart = 0;
+    let schedBeatIndex = 0;
+    let litIndex = 0;
+    let audioCtx = null;
+    let nextNoteTime = 0;
+    let timerId = null;
+    let runId = 0;
+    let startRequest = 0;
+    let scheduled = [];
+
+    const bpmText = document.getElementById("bpmText");
+    const slider = document.getElementById("slider");
+    const playBtn = document.getElementById("play");
+    const quarterBtn = document.getElementById("quarter");
+    const eighthBtn = document.getElementById("eighth");
+    const sixteenthBtn = document.getElementById("sixteenth");
+    const swingBtn = document.getElementById("swing");
+    const trainerBtn = document.getElementById("trainerBtn");
+    const dotsToggle = document.getElementById("dotsToggle");
+    const muteReset = document.getElementById("muteReset");
+    const soundSel = document.getElementById("sound");
+    const dotsBox = document.getElementById("dots");
+    const trainStartEl = document.getElementById("trainStart");
+    const trainTargetEl = document.getElementById("trainTarget");
+    const trainBarsEl = document.getElementById("trainBars");
+    const trainStepEl = document.getElementById("trainStep");
+    const trainStatus = document.getElementById("trainStatus");
+    const tempoBtns = [
+      document.getElementById("minus4"),
+      document.getElementById("minus1"),
+      document.getElementById("plus1"),
+      document.getElementById("plus4")
+    ];
+
+    function typingBpm() {
+      const el = document.activeElement;
+      return el === bpmText || el === trainStartEl || el === trainTargetEl || el === trainBarsEl || el === trainStepEl;
+    }
+
+    function displayedSubdiv() {
+      return pendingSubdiv !== null ? pendingSubdiv : gridSubdiv;
+    }
+
+    function displayedSwing() {
+      return pendingSwing !== null ? pendingSwing : gridSwing;
+    }
+
+    function visualSubdiv() {
+      return extraDots ? displayedSubdiv() : 1;
+    }
+
+    function muteGrid() {
+      return visualSubdiv();
+    }
+
+    function freshMutes() {
+      return {
+        1: [true, true, true, true],
+        2: [true, true, true, true, true, true, true, true],
+        4: Array(16).fill(true)
+      };
+    }
+
+    function resetMutes() {
+      mutes = freshMutes();
+      renderDots();
+      saveState();
+    }
+
+    function slotOn(n, index) {
+      const arr = mutes[n];
+      if (!arr || index < 0 || index >= arr.length) return true;
+      return arr[index] !== false;
+    }
+
+    function clickEnabled(thisBeat, thisSub) {
+      if (!extraDots) return slotOn(1, thisBeat);
+      const n = gridSubdiv;
+      return slotOn(n, thisBeat * n + thisSub);
+    }
+
+    function toggleMute(index) {
+      const n = muteGrid();
+      if (!mutes[n] || index < 0 || index >= mutes[n].length) return;
+      mutes[n][index] = !mutes[n][index];
+      renderDots();
+      saveState();
+    }
+
+    function paintDots(index) {
+      const nodes = [...dotsBox.children];
+      if (!nodes.length) return;
+      const safe = Math.max(0, Math.min(index, nodes.length - 1));
+      litIndex = safe;
+      const n = muteGrid();
+      nodes.forEach((d, i) => {
+        d.classList.toggle("on", i === safe);
+        d.classList.toggle("muted", !slotOn(n, i));
+      });
+    }
+
+    function renderDots() {
+      const n = visualSubdiv();
+      dotsBox.innerHTML = "";
+      const total = 4 * n;
+      for (let i = 0; i < total; i++) {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = "dot" + (i % n === 0 ? "" : " small");
+        el.setAttribute("aria-label", slotOn(n, i) ? "mute slot" : "unmute slot");
+        el.setAttribute("aria-pressed", slotOn(n, i) ? "true" : "false");
+        el.onclick = () => {
+          toggleMute(i);
+          el.blur();
+        };
+        dotsBox.appendChild(el);
+      }
+      const beatIndex = playing ? soundedBeatIndex : 0;
+      paintDots(holdBeat !== null ? beatIndex * n : Math.min(litIndex, total - 1));
+    }
+
+    function updateSubdivButtons(value) {
+      quarterBtn.classList.toggle("active", value === 1);
+      eighthBtn.classList.toggle("active", value === 2);
+      sixteenthBtn.classList.toggle("active", value === 4);
+      quarterBtn.setAttribute("aria-pressed", value === 1 ? "true" : "false");
+      eighthBtn.setAttribute("aria-pressed", value === 2 ? "true" : "false");
+      sixteenthBtn.setAttribute("aria-pressed", value === 4 ? "true" : "false");
+      renderDots();
+    }
+
+    function updateSwingButton(value) {
+      swingBtn.classList.toggle("active", value);
+      swingBtn.setAttribute("aria-pressed", value ? "true" : "false");
+    }
+
+    function updateDotsToggle() {
+      dotsToggle.classList.toggle("active", extraDots);
+      dotsToggle.setAttribute("aria-pressed", extraDots ? "true" : "false");
+      dotsToggle.textContent = extraDots ? "sub dots on" : "sub dots off";
+      renderDots();
+    }
+
+    function setTempoLocked(locked) {
+      tempoBtns.forEach((btn) => { btn.disabled = locked; });
+      slider.disabled = locked;
+      bpmText.readOnly = locked;
+    }
+
+    function updateTrainerButton() {
+      trainerBtn.classList.toggle("active", trainerOn);
+      trainerBtn.setAttribute("aria-pressed", trainerOn ? "true" : "false");
+      setTempoLocked(trainerRunning);
+    }
+
+    function trainerStatus() {
+      if (!trainerOn) {
+        trainStatus.textContent = "";
+        return;
+      }
+      if (!trainerRunning) {
+        trainStatus.textContent = "armed · play starts at " + trainStart;
+        return;
+      }
+      const way = shownPhase === "out" ? "up to " + trainTarget : "back to " + trainStart;
+      trainStatus.textContent = shownBars + "/" + trainBars + " bars · " + way;
+    }
+
+    function showBpm(value) {
+      shownBpm = value;
+      bpmText.value = String(value);
+      slider.value = String(value);
+    }
+
+    function syncStartFromTempo() {
+      if (trainerRunning) return;
+      trainStart = bpm;
+      trainStartEl.value = String(trainStart);
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(BPM_KEY, String(shownBpm));
+        localStorage.setItem(SUB_KEY, String(displayedSubdiv()));
+        localStorage.setItem(SWING_KEY, displayedSwing() ? "1" : "0");
+        localStorage.setItem(DOTS_KEY, extraDots ? "1" : "0");
+        localStorage.setItem(MUTE_KEY, JSON.stringify(mutes));
+        localStorage.setItem(SOUND_KEY, soundPreset);
+        localStorage.setItem(TRAIN_KEY, JSON.stringify({
+          on: trainerOn, start: trainStart, target: trainTarget, bars: trainBars, step: trainStep
+        }));
+      } catch (error) {}
+    }
+
+    function loadMutes(raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (
+          parsed &&
+          Array.isArray(parsed[1]) && parsed[1].length === 4 &&
+          Array.isArray(parsed[2]) && parsed[2].length === 8 &&
+          Array.isArray(parsed[4]) && parsed[4].length === 16
+        ) {
+          mutes = {
+            1: parsed[1].map(Boolean),
+            2: parsed[2].map(Boolean),
+            4: parsed[4].map(Boolean)
+          };
+          return;
+        }
+      } catch (error) {}
+      mutes = freshMutes();
+    }
+
+    function clamp(n, min, max) {
+      n = Math.round(Number(n));
+      if (!Number.isFinite(n)) return min;
+      return Math.min(max, Math.max(min, n));
+    }
+
+    function keepFutureOnly() {
+      if (!audioCtx) {
+        scheduled = [];
+        return;
+      }
+      const now = audioCtx.currentTime;
+      scheduled = scheduled.filter((item) => item.time > now);
+    }
+
+    function alreadyBooked(time) {
+      return scheduled.some((item) => Math.abs(item.time - time) < BOOK_SLACK);
+    }
+
+    function cancelFrom(fromTime) {
+      if (!audioCtx) return;
+      const keep = [];
+      for (const item of scheduled) {
+        if (item.time >= fromTime - 0.0005) {
+          for (const node of item.nodes) {
+            try { node.stop(Math.max(audioCtx.currentTime, fromTime)); } catch (error) {}
+          }
+        } else if (item.time > audioCtx.currentTime) {
+          keep.push(item);
+        }
+      }
+      scheduled = keep;
+    }
+
+    function applyPending() {
+      if (pendingBpm !== null) {
+        gridBpm = pendingBpm;
+        pendingBpm = null;
+      }
+      if (pendingSubdiv !== null) {
+        gridSubdiv = pendingSubdiv;
+        pendingSubdiv = null;
+      }
+      if (pendingSwing !== null) {
+        gridSwing = pendingSwing;
+        pendingSwing = null;
+      }
+    }
+
+    function tickDuration() {
+      const beatDur = 60 / gridBpm;
+      if (!gridSwing || gridSubdiv === 1) return beatDur / gridSubdiv;
+      if (gridSubdiv === 2) return sub === 0 ? beatDur * 2 / 3 : beatDur / 3;
+      return (sub % 2 === 0) ? beatDur / 3 : beatDur / 6;
+    }
+
+    function heardBeatEnd() {
+      const beatDur = 60 / gridBpm;
+      const now = audioCtx ? audioCtx.currentTime : 0;
+      let t = (schedBeatStart || nextNoteTime) + beatDur;
+      while (t <= now + 0.01) t += beatDur;
+      return t;
+    }
+
+    function queuePatternChange(needCancel) {
+      if (!playing || !audioCtx || changeQueued) return;
+      changeQueued = true;
+      const end = heardBeatEnd();
+      const crossed = nextNoteTime > end + 0.002;
+      if (needCancel || crossed) cancelFrom(end);
+      if (crossed) {
+        nextNoteTime = end;
+        sub = 0;
+        beat = (schedBeatIndex + 1) % 4;
+      }
+    }
+
+    function setBpm(v) {
+      if (trainerRunning) return;
+      const next = Math.min(300, Math.max(40, Math.round(Number(v))));
+      bpm = Number.isFinite(next) ? next : 60;
+      showBpm(bpm);
+      if (!playing) {
+        gridBpm = bpm;
+        pendingBpm = null;
+      } else {
+        pendingBpm = bpm;
+        queuePatternChange(false);
+      }
+      syncStartFromTempo();
+      saveState();
+    }
+
+    function commitTypedBpm() {
+      if (trainerRunning) {
+        bpmText.value = String(shownBpm);
+        return;
+      }
+      const raw = bpmText.value.trim();
+      if (raw === "" || Number.isNaN(Number(raw))) {
+        bpmText.value = String(shownBpm);
+        return;
+      }
+      setBpm(raw);
+    }
+
+    function setSubdiv(value) {
+      if (!playing) {
+        gridSubdiv = value;
+        pendingSubdiv = null;
+        sub = 0;
+        holdBeat = null;
+        litIndex = 0;
+      } else {
+        pendingSubdiv = value;
+        holdBeat = soundedBeatIndex;
+        queuePatternChange(true);
+      }
+      updateSubdivButtons(value);
+      saveState();
+    }
+
+    function setSwing() {
+      const target = !displayedSwing();
+      updateSwingButton(target);
+      if (!playing) {
+        gridSwing = target;
+        pendingSwing = null;
+      } else {
+        pendingSwing = target;
+        queuePatternChange(true);
+      }
+      saveState();
+    }
+
+    function toggleExtraDots() {
+      extraDots = !extraDots;
+      if (playing) holdBeat = soundedBeatIndex;
+      updateDotsToggle();
+      saveState();
+    }
+
+    function setSound(value) {
+      soundPreset = SOUND_OPTIONS.includes(value) ? value : "rim";
+      soundSel.value = soundPreset;
+      saveState();
+    }
+
+    function toggleTrainer() {
+      trainerOn = !trainerOn;
+      if (trainerOn && !playing) {
+        bpm = trainStart;
+        gridBpm = trainStart;
+        pendingBpm = null;
+        showBpm(trainStart);
+      }
+      updateTrainerButton();
+      trainerStatus();
+      saveState();
+    }
+
+    function readTrainerFields() {
+      trainStart = clamp(trainStartEl.value, 40, 300);
+      trainTarget = clamp(trainTargetEl.value, 40, 300);
+      trainBars = clamp(trainBarsEl.value, 1, 64);
+      trainStep = clamp(trainStepEl.value, 1, 32);
+      trainStartEl.value = String(trainStart);
+      trainTargetEl.value = String(trainTarget);
+      trainBarsEl.value = String(trainBars);
+      trainStepEl.value = String(trainStep);
+      if (trainerOn && !trainerRunning) {
+        bpm = trainStart;
+        gridBpm = trainStart;
+        pendingBpm = null;
+        showBpm(trainStart);
+      }
+      trainerStatus();
+      saveState();
+    }
+
+    function toward(from, to, step) {
+      if (from === to) return to;
+      if (to > from) return Math.min(to, from + step);
+      return Math.max(to, from - step);
+    }
+
+    function trainerTickOnBarOne() {
+      if (!trainerRunning || sub !== 0 || beat !== 0) return null;
+      if (trainerFirstBar) {
+        trainerFirstBar = false;
+        return { bars: barsDone, phase: trainerPhase, bpm: gridBpm, stop: false };
+      }
+      barsDone += 1;
+      if (barsDone >= trainBars) {
+        barsDone = 0;
+        if (trainStart === trainTarget) {
+          return { bars: trainBars, phase: trainerPhase, bpm: gridBpm, stop: true };
+        }
+        if (trainerPhase === "out") {
+          if (gridBpm === trainTarget) {
+            trainerPhase = "back";
+            gridBpm = toward(gridBpm, trainStart, trainStep);
+          } else {
+            gridBpm = toward(gridBpm, trainTarget, trainStep);
+          }
+          bpm = gridBpm;
+          pendingBpm = null;
+        } else if (gridBpm === trainStart) {
+          return { bars: trainBars, phase: trainerPhase, bpm: gridBpm, stop: true };
+        } else {
+          gridBpm = toward(gridBpm, trainStart, trainStep);
+          bpm = gridBpm;
+          pendingBpm = null;
+        }
+      }
+      return { bars: barsDone, phase: trainerPhase, bpm: gridBpm, stop: false };
+    }
+
+    function revealTrainer(snap) {
+      if (!snap) return;
+      shownBars = snap.bars;
+      shownPhase = snap.phase;
+      showBpm(snap.bpm);
+      trainerStatus();
+      if (snap.stop) stop();
+    }
+
+    async function ensureAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
+    }
+
+    function getNoise() {
+      if (noiseBuf) return noiseBuf;
+      const len = Math.floor(audioCtx.sampleRate * 0.08);
+      noiseBuf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+      const data = noiseBuf.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      return noiseBuf;
+    }
+
+    function envGain(time, peak, dur) {
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), time + 0.002);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+      gain.connect(audioCtx.destination);
+      return gain;
+    }
+
+    function tone(type, freq, time, peak, dur) {
+      const osc = audioCtx.createOscillator();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, time);
+      osc.connect(envGain(time, peak, dur));
+      osc.start(time);
+      osc.stop(time + dur + 0.01);
+      return osc;
+    }
+
+    function noiseBurst(time, peak, dur, hp, lp) {
+      const src = audioCtx.createBufferSource();
+      src.buffer = getNoise();
+      const high = audioCtx.createBiquadFilter();
+      high.type = "highpass";
+      high.frequency.value = hp;
+      const low = audioCtx.createBiquadFilter();
+      low.type = "lowpass";
+      low.frequency.value = lp;
+      src.connect(high);
+      high.connect(low);
+      low.connect(envGain(time, peak, dur));
+      src.start(time);
+      src.stop(time + dur + 0.01);
+      return src;
+    }
+
+    function book(time, nodes) {
+      scheduled.push({ time, nodes });
+      keepFutureOnly();
+    }
+
+    function scheduleClick(time, downbeat, isSub) {
+      if (alreadyBooked(time)) return;
+      const vol = isSub ? SUB_VOL : BEAT_VOL;
+      const nodes = [];
+
+      if (soundPreset === "soft") {
+        const freq = downbeat ? 1100 : (isSub ? 620 : 750);
+        nodes.push(tone("triangle", freq, time, vol * 0.55, 0.05));
+      } else if (soundPreset === "wood") {
+        const freq = downbeat ? 1250 : (isSub ? 780 : 900);
+        nodes.push(tone("triangle", freq, time, vol * 0.35, 0.055));
+        nodes.push(noiseBurst(time, vol * 0.22, 0.03, 800, 3500));
+      } else if (soundPreset === "crisp") {
+        const freq = downbeat ? 1700 : (isSub ? 1050 : 1200);
+        nodes.push(tone("square", freq, time, vol * 0.18, 0.028));
+      } else if (soundPreset === "rim") {
+        const freq = downbeat ? 1600 : 1100;
+        nodes.push(noiseBurst(time, vol * (isSub ? 0.16 : 0.28), isSub ? 0.018 : 0.028, 1500, 6000));
+        nodes.push(tone("triangle", freq, time, vol * 0.12, 0.03));
+      } else if (soundPreset === "clave") {
+        const freq = downbeat ? 2100 : (isSub ? 1400 : 1650);
+        nodes.push(tone("triangle", freq, time, vol * 0.45, 0.022));
+        nodes.push(tone("sine", freq * 1.5, time, vol * 0.12, 0.016));
+      } else {
+        const freq = downbeat ? 1400 : 1000;
+        nodes.push(tone("sine", freq, time, vol, CLICK_LEN));
+      }
+
+      book(time, nodes);
+    }
+
+    function nextTick() {
+      nextNoteTime += tickDuration();
+      sub += 1;
+      if (sub >= gridSubdiv) {
+        sub = 0;
+        beat = (beat + 1) % 4;
+      }
+    }
+
+    function lightForClick(thisBeat, thisSub) {
+      const n = visualSubdiv();
+      if (holdBeat !== null && thisSub !== 0 && thisBeat === holdBeat) {
+        paintDots(thisBeat * n);
+        return;
+      }
+      if (thisSub === 0 && (holdBeat === null || thisBeat !== holdBeat)) {
+        holdBeat = null;
+      }
+      if (!extraDots) {
+        paintDots(thisBeat);
+        return;
+      }
+      paintDots(thisBeat * n + thisSub);
+    }
+
+    function skipMissedNotes() {
+      const now = audioCtx.currentTime;
+      let skipped = false;
+      let snap = null;
+      while (nextNoteTime < now - LATE_SLACK) {
+        skipped = true;
+        if (sub === 0) {
+          applyPending();
+          schedBeatStart = nextNoteTime;
+          schedBeatIndex = beat;
+        }
+        const stepSnap = trainerTickOnBarOne();
+        if (stepSnap) snap = stepSnap;
+        nextTick();
+      }
+      if (snap) revealTrainer(snap);
+      if (skipped) lightForClick(beat, sub);
+    }
+
+    function scheduler(currentRunId) {
+      if (!playing || !audioCtx || currentRunId !== runId) return;
+      keepFutureOnly();
+      skipMissedNotes();
+
+      while (nextNoteTime < audioCtx.currentTime + SCHEDULE_AHEAD) {
+        if (sub === 0) applyPending();
+        const trainerSnap = trainerTickOnBarOne();
+
+        const thisBeat = beat;
+        const thisSub = sub;
+        const time = nextNoteTime;
+        const isDownbeat = thisBeat === 0 && thisSub === 0;
+        const isSubClick = thisSub !== 0;
+
+        if (thisSub === 0) {
+          schedBeatStart = time;
+          schedBeatIndex = thisBeat;
+        }
+
+        if (time >= audioCtx.currentTime - LATE_SLACK && clickEnabled(thisBeat, thisSub)) {
+          scheduleClick(time, isDownbeat, isSubClick);
+        }
+
+        const delay = Math.max(0, (time - audioCtx.currentTime) * 1000);
+        setTimeout(() => {
+          if (!playing || currentRunId !== runId) return;
+          if (thisSub === 0) {
+            soundedBeatStart = time;
+            soundedBeatIndex = thisBeat;
+            changeQueued = false;
+          }
+          if (trainerSnap) revealTrainer(trainerSnap);
+          lightForClick(thisBeat, thisSub);
+        }, delay);
+
+        nextTick();
+      }
+
+      timerId = setTimeout(() => scheduler(currentRunId), LOOKAHEAD_MS);
+    }
+
+    async function start() {
+      if (playing || starting) return;
+      starting = true;
+      const request = ++startRequest;
+
+      try {
+        await ensureAudio();
+      } catch (error) {
+        console.error("Unable to start audio", error);
+        starting = false;
+        return;
+      }
+
+      starting = false;
+      if (request !== startRequest) return;
+
+      if (trainerOn) {
+        readTrainerFields();
+        bpm = trainStart;
+        gridBpm = trainStart;
+        pendingBpm = null;
+        shownBpm = trainStart;
+        shownBars = 0;
+        shownPhase = "out";
+        showBpm(trainStart);
+        trainerRunning = true;
+        trainerPhase = "out";
+        trainerFirstBar = true;
+        barsDone = 0;
+      } else {
+        trainerRunning = false;
+      }
+
+      playing = true;
+      beat = 0;
+      sub = 0;
+      litIndex = 0;
+      holdBeat = null;
+      gridBpm = bpm;
+      applyPending();
+      changeQueued = false;
+      runId += 1;
+      scheduled = [];
+      nextNoteTime = audioCtx.currentTime + 0.05;
+      schedBeatStart = nextNoteTime;
+      schedBeatIndex = 0;
+      soundedBeatStart = nextNoteTime;
+      soundedBeatIndex = 0;
+      renderDots();
+      playBtn.textContent = "stop";
+      playBtn.classList.add("stop");
+      setTempoLocked(trainerRunning);
+      trainerStatus();
+      scheduler(runId);
+    }
+
+    function stop() {
+      playing = false;
+      starting = false;
+      trainerRunning = false;
+      startRequest += 1;
+      runId += 1;
+      clearTimeout(timerId);
+      timerId = null;
+      if (audioCtx) cancelFrom(audioCtx.currentTime);
+      scheduled = [];
+      beat = 0;
+      sub = 0;
+      litIndex = 0;
+      holdBeat = null;
+      applyPending();
+      changeQueued = false;
+      gridBpm = bpm;
+      renderDots();
+      playBtn.textContent = "play";
+      playBtn.classList.remove("stop");
+      setTempoLocked(false);
+      trainerStatus();
+    }
+
+    function togglePlay() {
+      if (playing || starting) stop();
+      else start();
+    }
+
+    function bindTap(el, fn) {
+      el.onclick = () => {
+        if (el.disabled) return;
+        fn();
+        el.blur();
+      };
+    }
+
+    bindTap(playBtn, togglePlay);
+    bindTap(document.getElementById("minus4"), () => setBpm(bpm - 4));
+    bindTap(document.getElementById("minus1"), () => setBpm(bpm - 1));
+    bindTap(document.getElementById("plus1"), () => setBpm(bpm + 1));
+    bindTap(document.getElementById("plus4"), () => setBpm(bpm + 4));
+    bindTap(quarterBtn, () => setSubdiv(1));
+    bindTap(eighthBtn, () => setSubdiv(2));
+    bindTap(sixteenthBtn, () => setSubdiv(4));
+    bindTap(swingBtn, setSwing);
+    bindTap(trainerBtn, toggleTrainer);
+    bindTap(dotsToggle, toggleExtraDots);
+    bindTap(muteReset, resetMutes);
+    soundSel.onchange = (e) => setSound(e.target.value);
+    slider.oninput = (e) => { if (!trainerRunning) setBpm(e.target.value); };
+    [trainStartEl, trainTargetEl, trainBarsEl, trainStepEl].forEach((el) => {
+      el.addEventListener("change", readTrainerFields);
+      el.addEventListener("blur", readTrainerFields);
+    });
+
+    bpmText.addEventListener("focus", () => { if (!trainerRunning) bpmText.select(); });
+    bpmText.addEventListener("change", commitTypedBpm);
+    bpmText.addEventListener("blur", commitTypedBpm);
+    bpmText.addEventListener("keydown", (e) => {
+      if (trainerRunning) {
+        if (e.code === "ArrowUp" || e.code === "ArrowDown") e.preventDefault();
+        return;
+      }
+      if (e.code === "Enter") {
+        e.preventDefault();
+        commitTypedBpm();
+        bpmText.blur();
+      } else if (e.code === "Escape") {
+        e.preventDefault();
+        bpmText.value = String(shownBpm);
+        bpmText.blur();
+      } else if (e.code === "ArrowUp") {
+        e.preventDefault();
+        setBpm(bpm + 1);
+      } else if (e.code === "ArrowDown") {
+        e.preventDefault();
+        setBpm(bpm - 1);
+      } else if (e.code === "Space") {
+        e.preventDefault();
+        bpmText.blur();
+        togglePlay();
+      }
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space") {
+        if (typingBpm()) return;
+        e.preventDefault();
+        togglePlay();
+        if (document.activeElement && document.activeElement.blur) {
+          document.activeElement.blur();
+        }
+        return;
+      }
+
+      if (trainerRunning) return;
+      if (typingBpm() || document.activeElement === slider || document.activeElement === soundSel) return;
+
+      if (e.code === "ArrowUp") {
+        e.preventDefault();
+        setBpm(bpm + 1);
+      } else if (e.code === "ArrowDown") {
+        e.preventDefault();
+        setBpm(bpm - 1);
+      } else if (e.code === "ArrowLeft") {
+        e.preventDefault();
+        setBpm(bpm - 4);
+      } else if (e.code === "ArrowRight") {
+        e.preventDefault();
+        setBpm(bpm + 4);
+      }
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible" || !playing || !audioCtx) return;
+      if (timerId) clearTimeout(timerId);
+      scheduler(runId);
+    });
+
+    try {
+      const savedBpm = localStorage.getItem(BPM_KEY);
+      const savedSub = localStorage.getItem(SUB_KEY);
+      const savedSwing = localStorage.getItem(SWING_KEY);
+      const savedDots = localStorage.getItem(DOTS_KEY);
+      const savedMutes = localStorage.getItem(MUTE_KEY);
+      const savedSound = localStorage.getItem(SOUND_KEY);
+      const savedTrain = localStorage.getItem(TRAIN_KEY);
+      extraDots = savedDots === "1";
+      if (savedMutes) loadMutes(savedMutes);
+      soundPreset = SOUND_OPTIONS.includes(savedSound) ? savedSound : "rim";
+      soundSel.value = soundPreset;
+      if (savedTrain) {
+        const t = JSON.parse(savedTrain);
+        trainStart = clamp(t.start, 40, 300);
+        trainTarget = clamp(t.target, 40, 300);
+        trainBars = clamp(t.bars, 1, 64);
+        trainStep = clamp(t.step, 1, 32);
+        trainerOn = !!t.on;
+      }
+      trainStartEl.value = String(trainStart);
+      trainTargetEl.value = String(trainTarget);
+      trainBarsEl.value = String(trainBars);
+      trainStepEl.value = String(trainStep);
+      const n = Number(savedBpm);
+      const initial = trainerOn ? trainStart : (Number.isFinite(n) ? n : 60);
+      bpm = initial;
+      gridBpm = initial;
+      showBpm(initial);
+      if (!trainerRunning) syncStartFromTempo();
+      if (savedSub === "2" || savedSub === "4") {
+        gridSubdiv = Number(savedSub);
+      }
+      updateSubdivButtons(gridSubdiv);
+      updateDotsToggle();
+      updateTrainerButton();
+      trainerStatus();
+      saveState();
+      if (savedSwing === "1") {
+        gridSwing = true;
+        updateSwingButton(true);
+      }
+    } catch (error) {
+      setBpm(60);
+      updateSubdivButtons(1);
+      updateDotsToggle();
+      updateTrainerButton();
+    }
+  </script>
+</body>
+</html>
