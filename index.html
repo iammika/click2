@@ -6,7 +6,7 @@
   <style>
     body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
       font-family:Segoe UI,sans-serif; background:#111; color:#fff; }
-    .wrap { width:min(520px,96vw); text-align:center; }
+    .wrap { width:min(920px,96vw); text-align:center; }
     .logo {
       position:fixed;
       top:18px;
@@ -32,9 +32,22 @@
       -moz-appearance:textfield;
       margin-bottom:22px;
     }
+    .bpm:focus-visible {
+      outline:2px solid #2ec4d6;
+      outline-offset:8px;
+      border-radius:12px;
+    }
     .bpm::-webkit-outer-spin-button,
     .bpm::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-    .dots { display:flex; justify-content:center; align-items:center; gap:12px; margin-bottom:28px; min-height:48px; }
+    .dots {
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap:12px;
+      margin-bottom:28px;
+      min-height:48px;
+      flex-wrap:nowrap;
+    }
     button { border:0; border-radius:12px; background:#2a2a2a; color:#fff;
       font-size:18px; font-weight:600; padding:12px 18px; cursor:pointer; }
     button.active { background:#2ec4d6; color:#111; }
@@ -68,6 +81,52 @@
     .play { width:100%; border-radius:999px; padding:16px; font-size:22px; background:#1f8a4c; }
     .play.stop { background:#4a5d6e; }
     .row { display:flex; justify-content:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+    .subdiv-row { align-items:center; flex-wrap:nowrap; }
+    .btn-group {
+      display:flex;
+      overflow:hidden;
+      border-radius:12px;
+      background:#1a1a1a;
+    }
+    .btn-group button {
+      border-radius:0;
+      padding:8px 12px;
+      min-width:52px;
+      background:#2a2a2a;
+      box-shadow:inset -1px 0 0 #111;
+    }
+    .btn-group button:last-child { box-shadow:none; }
+    .btn-group button.active { background:#2ec4d6; color:#111; }
+    .tempo-group button {
+      padding:12px 18px;
+      min-width:56px;
+    }
+    .note {
+      display:block;
+      width:34px;
+      height:26px;
+    }
+    .swing-btn { min-width:84px; }
+    .sub-menu {
+      position:fixed;
+      z-index:80;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+      border-radius:12px;
+      background:#1a1a1a;
+      box-shadow:0 8px 24px rgba(0,0,0,0.45);
+    }
+    .sub-menu[hidden] { display:none; }
+    .sub-menu button {
+      border-radius:0;
+      padding:8px 12px;
+      min-width:52px;
+      background:#2a2a2a;
+      box-shadow:inset 0 -1px 0 #111;
+    }
+    .sub-menu button:last-child { box-shadow:none; }
+    .sub-menu button.active { background:#2ec4d6; color:#111; }
     input[type=range] { width:100%; }
     select, .trainer-box input {
       background:#2a2a2a;
@@ -80,7 +139,7 @@
     select { width:100%; }
     .hint {
       margin-top:22px;
-      color:#666;
+      color:#aaa;
       font-size:12px;
       white-space:nowrap;
     }
@@ -95,7 +154,7 @@
       gap:8px;
       width:150px;
     }
-    .dots-toggle, .mute-reset {
+    .dots-toggle, .mute-reset, .subs-reset {
       font-size:13px;
       padding:8px 12px;
       border-radius:999px;
@@ -129,7 +188,7 @@
     .trainer-status {
       grid-column:1 / -1;
       text-align:center;
-      color:#666;
+      color:#aaa;
       height:32px;
       line-height:16px;
       overflow:hidden;
@@ -141,6 +200,7 @@
   <div class="corner">
     <button type="button" class="dots-toggle" id="dotsToggle" aria-pressed="false">sub dots</button>
     <button type="button" class="mute-reset" id="muteReset">reset mutes</button>
+    <button type="button" class="subs-reset" id="subsReset">reset subs</button>
     <select id="sound" aria-label="click sound">
       <option value="rim">rim</option>
       <option value="woodblock">woodblock</option>
@@ -156,28 +216,87 @@
     <label>target bpm <input id="trainTarget" type="number" min="40" max="300" value="100" inputmode="numeric"></label>
     <label>bar interval <input id="trainBars" type="number" min="1" max="64" value="8" inputmode="numeric"></label>
     <label>± bpm <input id="trainStep" type="number" min="1" max="32" value="4" inputmode="numeric"></label>
-    <div class="trainer-status" id="trainStatus">&nbsp;</div>
+    <div class="trainer-status" id="trainStatus" aria-live="polite" aria-atomic="true">&nbsp;</div>
   </div>
+  <div id="subMenu" class="sub-menu" hidden role="menu" aria-label="beat subdivision"></div>
   <div class="wrap">
     <input class="bpm" id="bpmText" type="number" min="40" max="300" value="60" inputmode="numeric" autocomplete="off" aria-label="tempo in bpm" />
     <div class="dots" id="dots"></div>
     <div class="row">
-      <button type="button" id="minus4">-4</button>
-      <button type="button" id="minus1">-1</button>
-      <button type="button" id="plus1">+1</button>
-      <button type="button" id="plus4">+4</button>
+      <div class="btn-group tempo-group" role="group" aria-label="tempo">
+        <button type="button" id="minus4">-4</button>
+        <button type="button" id="minus1">-1</button>
+        <button type="button" id="plus1">+1</button>
+        <button type="button" id="plus4">+4</button>
+      </div>
     </div>
-    <div class="row">
-      <button type="button" id="quarter" aria-pressed="true">quarter</button>
-      <button type="button" id="eighth" aria-pressed="false">8th</button>
-      <button type="button" id="sixteenth" aria-pressed="false">16th</button>
-      <button type="button" id="swing" aria-pressed="false">swing</button>
+    <div class="row subdiv-row">
+      <div class="btn-group" id="subdivGroup" role="group" aria-label="subdivision">
+        <button type="button" id="quarter" data-sub="1" aria-pressed="true" aria-label="quarter" title="quarter">
+          <svg class="note" viewBox="0 0 24 26" fill="currentColor" aria-hidden="true">
+            <ellipse cx="8" cy="20.5" rx="5.4" ry="3.8" transform="rotate(-22 8 20.5)"/>
+            <rect x="12.4" y="3" width="1.8" height="17.4"/>
+          </svg>
+        </button>
+        <button type="button" id="eighth" data-sub="2" aria-pressed="false" aria-label="8th" title="8th">
+          <svg class="note" viewBox="0 0 34 26" fill="currentColor" aria-hidden="true">
+            <ellipse cx="7" cy="21" rx="4.4" ry="3.2" transform="rotate(-22 7 21)"/>
+            <ellipse cx="20" cy="21" rx="4.4" ry="3.2" transform="rotate(-22 20 21)"/>
+            <rect x="10.4" y="5" width="1.6" height="16"/>
+            <rect x="23.4" y="5" width="1.6" height="16"/>
+            <rect x="10.4" y="5" width="14.6" height="2.4"/>
+          </svg>
+        </button>
+        <button type="button" id="triplet" data-sub="3" aria-pressed="false" aria-label="triplet" title="triplet">
+          <svg class="note" viewBox="0 0 40 26" fill="currentColor" aria-hidden="true">
+            <text x="20" y="7" text-anchor="middle" font-size="7" font-family="Segoe UI,sans-serif" font-weight="700">3</text>
+            <ellipse cx="7" cy="21.2" rx="3.6" ry="2.6" transform="rotate(-22 7 21.2)"/>
+            <ellipse cx="18" cy="21.2" rx="3.6" ry="2.6" transform="rotate(-22 18 21.2)"/>
+            <ellipse cx="29" cy="21.2" rx="3.6" ry="2.6" transform="rotate(-22 29 21.2)"/>
+            <rect x="9.8" y="8.5" width="1.4" height="12.6"/>
+            <rect x="20.8" y="8.5" width="1.4" height="12.6"/>
+            <rect x="31.8" y="8.5" width="1.4" height="12.6"/>
+            <rect x="9.8" y="8.5" width="23.4" height="2"/>
+          </svg>
+        </button>
+        <button type="button" id="sixteenth" data-sub="4" aria-pressed="false" aria-label="16th" title="16th">
+          <svg class="note" viewBox="0 0 40 26" fill="currentColor" aria-hidden="true">
+            <ellipse cx="7" cy="21.2" rx="3.4" ry="2.5" transform="rotate(-22 7 21.2)"/>
+            <ellipse cx="16.5" cy="21.2" rx="3.4" ry="2.5" transform="rotate(-22 16.5 21.2)"/>
+            <ellipse cx="26" cy="21.2" rx="3.4" ry="2.5" transform="rotate(-22 26 21.2)"/>
+            <ellipse cx="35.5" cy="21.2" rx="3.4" ry="2.5" transform="rotate(-22 35.5 21.2)"/>
+            <rect x="9.6" y="5" width="1.3" height="16.2"/>
+            <rect x="19.1" y="5" width="1.3" height="16.2"/>
+            <rect x="28.6" y="5" width="1.3" height="16.2"/>
+            <rect x="38.1" y="5" width="1.3" height="16.2"/>
+            <rect x="9.6" y="5" width="29.8" height="1.7"/>
+            <rect x="9.6" y="8" width="29.8" height="1.7"/>
+          </svg>
+        </button>
+        <button type="button" id="quintuplet" data-sub="5" aria-pressed="false" aria-label="quintuplet" title="quintuplet">
+          <svg class="note" viewBox="0 0 44 26" fill="currentColor" aria-hidden="true">
+            <text x="22" y="7" text-anchor="middle" font-size="7" font-family="Segoe UI,sans-serif" font-weight="700">5</text>
+            <ellipse cx="6" cy="21.4" rx="3" ry="2.2" transform="rotate(-22 6 21.4)"/>
+            <ellipse cx="14" cy="21.4" rx="3" ry="2.2" transform="rotate(-22 14 21.4)"/>
+            <ellipse cx="22" cy="21.4" rx="3" ry="2.2" transform="rotate(-22 22 21.4)"/>
+            <ellipse cx="30" cy="21.4" rx="3" ry="2.2" transform="rotate(-22 30 21.4)"/>
+            <ellipse cx="38" cy="21.4" rx="3" ry="2.2" transform="rotate(-22 38 21.4)"/>
+            <rect x="8.2" y="8.6" width="1.2" height="12.6"/>
+            <rect x="16.2" y="8.6" width="1.2" height="12.6"/>
+            <rect x="24.2" y="8.6" width="1.2" height="12.6"/>
+            <rect x="32.2" y="8.6" width="1.2" height="12.6"/>
+            <rect x="40.2" y="8.6" width="1.2" height="12.6"/>
+            <rect x="8.2" y="8.6" width="33.2" height="1.8"/>
+          </svg>
+        </button>
+      </div>
+      <button type="button" class="swing-btn" id="swing" aria-pressed="false">swing</button>
     </div>
     <input id="slider" type="range" min="40" max="300" value="60" autocomplete="off" aria-label="tempo slider" />
     <div class="row" style="margin-top:22px">
       <button type="button" class="play" id="play">play</button>
     </div>
-    <p class="hint">space = play/stop · up/down = ±1 · left/right = ±4 · click a dot to mute</p>
+    <p class="hint">space = play/stop · up/down = ±1 · left/right = ±4 · click a dot to mute · right-click a beat to set subs</p>
   </div>
   <script>
     const LOOKAHEAD_MS = 25;
@@ -189,20 +308,44 @@
     const SUB_VOL = 0.28;
     const BPM_KEY = "click-metronome-bpm";
     const SUB_KEY = "click-metronome-subdiv";
+    const GRID_SUB_KEY = "click-metronome-grid-subs";
     const SWING_KEY = "click-metronome-swing";
     const DOTS_KEY = "click-metronome-extra-dots";
     const MUTE_KEY = "click-metronome-mutes";
+    const MUTE_GRID_KEY = "click-metronome-grid-mutes";
     const SOUND_KEY = "click-metronome-sound";
     const TRAIN_KEY = "click-metronome-trainer-v2";
     const SOUND_OPTIONS = ["rim", "woodblock", "clave", "soft triangle", "sine", "square"];
     const SOUND_LEGACY = { wood: "woodblock", soft: "soft triangle", crisp: "square" };
+    const SUB_CHOICES = [1, 2, 3, 4, 5];
+
+    function defaultSubs() {
+      return { 1: [1, 1, 1, 1], 2: [2, 2, 2, 2], 3: [3, 3, 3, 3], 4: [4, 4, 4, 4], 5: [5, 5, 5, 5] };
+    }
+    function emptyPendingSubs() {
+      return { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null, null, null], 5: [null, null, null, null] };
+    }
+    function defaultMutes() {
+      const out = {};
+      for (const n of SUB_CHOICES) out[n] = [0, 1, 2, 3].map(() => Array(n).fill(true));
+      return out;
+    }
+    function resizeMuteRow(row, len) {
+      const next = Array.isArray(row) ? row.map(Boolean) : [];
+      while (next.length < len) next.push(true);
+      return next.slice(0, len);
+    }
 
     let bpm = 60;
     let gridBpm = 60;
-    let gridSubdiv = 1;
+    let currentGrid = 1;
+    let pendingGrid = null;
+    let gridSubs = defaultSubs();
+    let pendingGridSubs = emptyPendingSubs();
+    let gridMutes = defaultMutes();
+    let soundingMutes = [null, null, null, null];
     let gridSwing = false;
     let pendingBpm = null;
-    let pendingSubdiv = null;
     let pendingSwing = null;
     let pendingTrainBpm = null;
     let changeQueued = false;
@@ -210,11 +353,7 @@
     let extraDots = false;
     let soundPreset = "rim";
     let noiseBuf = null;
-    let mutes = {
-      1: [true, true, true, true],
-      2: [true, true, true, true, true, true, true, true],
-      4: Array(16).fill(true)
-    };
+    let menuBeat = 0;
 
     let trainerOn = false;
     let trainStart = 60;
@@ -224,6 +363,7 @@
     let trainerRunning = false;
     let trainerPhase = "out";
     let trainerFirstBar = true;
+    let trainerJoinLive = false;
     let barsDone = 0;
     let shownBpm = 60;
     let shownBars = 0;
@@ -250,13 +390,17 @@
     const playBtn = document.getElementById("play");
     const quarterBtn = document.getElementById("quarter");
     const eighthBtn = document.getElementById("eighth");
+    const tripletBtn = document.getElementById("triplet");
     const sixteenthBtn = document.getElementById("sixteenth");
+    const quintupletBtn = document.getElementById("quintuplet");
     const swingBtn = document.getElementById("swing");
     const trainerBtn = document.getElementById("trainerBtn");
     const dotsToggle = document.getElementById("dotsToggle");
     const muteReset = document.getElementById("muteReset");
+    const subsReset = document.getElementById("subsReset");
     const soundSel = document.getElementById("sound");
     const dotsBox = document.getElementById("dots");
+    const subMenu = document.getElementById("subMenu");
     const trainStartEl = document.getElementById("trainStart");
     const trainTargetEl = document.getElementById("trainTarget");
     const trainBarsEl = document.getElementById("trainBars");
@@ -268,101 +412,199 @@
       document.getElementById("plus1"),
       document.getElementById("plus4")
     ];
+    const subdivBtns = [quarterBtn, eighthBtn, tripletBtn, sixteenthBtn, quintupletBtn];
 
     function typingBpm() {
       const el = document.activeElement;
       return el === bpmText || el === trainStartEl || el === trainTargetEl || el === trainBarsEl || el === trainStepEl;
     }
 
-    function displayedSubdiv() {
-      return pendingSubdiv !== null ? pendingSubdiv : gridSubdiv;
+    function displayedGrid() {
+      return pendingGrid !== null ? pendingGrid : currentGrid;
+    }
+
+    function shownBeatSub(b, grid) {
+      const g = grid || displayedGrid();
+      if (pendingGridSubs[g][b] !== null) return pendingGridSubs[g][b];
+      return gridSubs[g][b] || g;
+    }
+
+    function liveBeatSub(b) {
+      return gridSubs[currentGrid][b] || currentGrid;
     }
 
     function displayedSwing() {
       return pendingSwing !== null ? pendingSwing : gridSwing;
     }
 
-    function visualSubdiv() {
-      return extraDots ? displayedSubdiv() : 1;
+    function slotOn(grid, beatIndex, slot) {
+      const row = gridMutes[grid] && gridMutes[grid][beatIndex];
+      if (!row || slot < 0 || slot >= row.length) return true;
+      return row[slot] !== false;
     }
 
-    function muteGrid() {
-      return visualSubdiv();
-    }
-
-    function freshMutes() {
-      return {
-        1: [true, true, true, true],
-        2: [true, true, true, true, true, true, true, true],
-        4: Array(16).fill(true)
-      };
-    }
-
-    function resetMutes() {
-      mutes = freshMutes();
-      renderDots();
-      saveState();
-    }
-
-    function slotOn(n, index) {
-      const arr = mutes[n];
-      if (!arr || index < 0 || index >= arr.length) return true;
-      return arr[index] !== false;
+    function liveSlotOn(beatIndex, slot) {
+      const row = soundingMutes[beatIndex] || (gridMutes[currentGrid] && gridMutes[currentGrid][beatIndex]);
+      if (!row || slot < 0 || slot >= row.length) return true;
+      return row[slot] !== false;
     }
 
     function clickEnabled(thisBeat, thisSub) {
-      if (!extraDots) return slotOn(1, thisBeat);
-      const n = gridSubdiv;
-      return slotOn(n, thisBeat * n + thisSub);
+      if (!extraDots) return liveSlotOn(thisBeat, 0);
+      return liveSlotOn(thisBeat, thisSub);
     }
 
-    function toggleMute(index) {
-      const n = muteGrid();
-      if (!mutes[n] || index < 0 || index >= mutes[n].length) return;
-      mutes[n][index] = !mutes[n][index];
+    function toggleMute(grid, beatIndex, slot) {
+      if (!gridMutes[grid] || !gridMutes[grid][beatIndex]) return;
+      const row = gridMutes[grid][beatIndex];
+      if (slot < 0 || slot >= row.length) return;
+      row[slot] = !row[slot];
       renderDots();
       saveState();
     }
 
+    function applyBeatSub(grid, beatIndex, value) {
+      gridSubs[grid][beatIndex] = value;
+      gridMutes[grid][beatIndex] = resizeMuteRow(gridMutes[grid][beatIndex], value);
+      soundingMutes[beatIndex] = null;
+    }
+
+    function resetMutes() {
+      gridMutes = defaultMutes();
+      soundingMutes = [null, null, null, null];
+      for (const g of SUB_CHOICES) {
+        for (let b = 0; b < 4; b++) {
+          gridMutes[g][b] = resizeMuteRow([], shownBeatSub(b, g));
+        }
+      }
+      renderDots();
+      saveState();
+    }
+
+    function resetSubs() {
+      for (const g of SUB_CHOICES) {
+        if (playing && g === currentGrid) {
+          pendingGridSubs[g] = [g, g, g, g];
+          for (let b = 0; b < 4; b++) gridMutes[g][b] = Array(g).fill(true);
+        } else {
+          gridSubs[g] = [g, g, g, g];
+          pendingGridSubs[g] = [null, null, null, null];
+          for (let b = 0; b < 4; b++) gridMutes[g][b] = Array(g).fill(true);
+        }
+      }
+      if (playing) {
+        holdBeat = soundedBeatIndex;
+        queuePatternChange(true);
+      }
+      updateSubdivButtons();
+      saveState();
+    }
+
+    function flatIndex(thisBeat, thisSub) {
+      if (!extraDots) return thisBeat;
+      let i = 0;
+      for (let b = 0; b < thisBeat; b++) i += shownBeatSub(b);
+      return i + thisSub;
+    }
+
+    function dotNodes() {
+      return [...dotsBox.querySelectorAll(".dot")];
+    }
+
     function paintDots(index) {
-      const nodes = [...dotsBox.children];
+      const nodes = dotNodes();
       if (!nodes.length) return;
       const safe = Math.max(0, Math.min(index, nodes.length - 1));
       litIndex = safe;
-      const n = muteGrid();
+      const g = displayedGrid();
       nodes.forEach((d, i) => {
+        const beatIndex = Number(d.dataset.beat);
+        const slot = Number(d.dataset.slot);
         d.classList.toggle("on", i === safe);
-        d.classList.toggle("muted", !slotOn(n, i));
+        d.classList.toggle("muted", !slotOn(g, beatIndex, extraDots ? slot : 0));
       });
     }
 
-    function renderDots() {
-      const n = visualSubdiv();
-      dotsBox.innerHTML = "";
-      const total = 4 * n;
-      for (let i = 0; i < total; i++) {
-        const el = document.createElement("button");
-        el.type = "button";
-        el.className = "dot" + (i % n === 0 ? "" : " small");
-        el.setAttribute("aria-label", slotOn(n, i) ? "mute slot" : "unmute slot");
-        el.setAttribute("aria-pressed", slotOn(n, i) ? "true" : "false");
-        el.onclick = () => {
-          toggleMute(i);
-          el.blur();
-        };
-        dotsBox.appendChild(el);
-      }
-      const beatIndex = playing ? soundedBeatIndex : 0;
-      paintDots(holdBeat !== null ? beatIndex * n : Math.min(litIndex, total - 1));
+    function hideSubMenu() {
+      subMenu.hidden = true;
     }
 
-    function updateSubdivButtons(value) {
-      quarterBtn.classList.toggle("active", value === 1);
-      eighthBtn.classList.toggle("active", value === 2);
-      sixteenthBtn.classList.toggle("active", value === 4);
-      quarterBtn.setAttribute("aria-pressed", value === 1 ? "true" : "false");
-      eighthBtn.setAttribute("aria-pressed", value === 2 ? "true" : "false");
-      sixteenthBtn.setAttribute("aria-pressed", value === 4 ? "true" : "false");
+    function showSubMenu(event, beatIndex) {
+      menuBeat = beatIndex;
+      const current = shownBeatSub(beatIndex);
+      [...subMenu.children].forEach((btn) => {
+        const value = Number(btn.dataset.sub);
+        btn.classList.toggle("active", value === current);
+        btn.setAttribute("aria-pressed", value === current ? "true" : "false");
+      });
+      subMenu.hidden = false;
+      const pad = 8;
+      const x = Math.min(event.clientX, window.innerWidth - subMenu.offsetWidth - pad);
+      const y = Math.min(event.clientY, window.innerHeight - subMenu.offsetHeight - pad);
+      subMenu.style.left = Math.max(pad, x) + "px";
+      subMenu.style.top = Math.max(pad, y) + "px";
+    }
+
+    function hitBeat(event) {
+      const nodes = dotNodes();
+      if (!nodes.length) return null;
+      const boxes = nodes.map((node) => ({ beat: Number(node.dataset.beat), box: node.getBoundingClientRect() }));
+      const top = Math.min(...boxes.map((item) => item.box.top));
+      const bottom = Math.max(...boxes.map((item) => item.box.bottom));
+      if (event.clientY < top || event.clientY > bottom) return null;
+
+      const byBeat = [[], [], [], []];
+      boxes.forEach((item) => byBeat[item.beat].push(item.box));
+
+      for (let b = 0; b < 4; b++) {
+        if (!byBeat[b].length) continue;
+        const left = Math.min(...byBeat[b].map((box) => box.left));
+        const ownRight = Math.max(...byBeat[b].map((box) => box.right));
+        let right = ownRight;
+        for (let n = b + 1; n < 4; n++) {
+          if (byBeat[n].length) {
+            right = Math.min(...byBeat[n].map((box) => box.left));
+            break;
+          }
+        }
+        if (event.clientX >= left && event.clientX < right) return b;
+        if (b === 3 && event.clientX >= left && event.clientX <= ownRight) return b;
+      }
+      return null;
+    }
+
+    function renderDots() {
+      dotsBox.innerHTML = "";
+      const g = displayedGrid();
+      for (let b = 0; b < 4; b++) {
+        const n = extraDots ? shownBeatSub(b, g) : 1;
+        for (let s = 0; s < n; s++) {
+          const el = document.createElement("button");
+          el.type = "button";
+          el.className = "dot" + (s === 0 ? "" : " small");
+          el.dataset.beat = String(b);
+          el.dataset.slot = String(s);
+          el.setAttribute("aria-label", slotOn(g, b, extraDots ? s : 0) ? "mute slot" : "unmute slot");
+          el.setAttribute("aria-pressed", slotOn(g, b, extraDots ? s : 0) ? "true" : "false");
+          el.onclick = () => {
+            toggleMute(g, b, extraDots ? s : 0);
+            el.blur();
+          };
+          dotsBox.appendChild(el);
+        }
+      }
+      const beatIndex = playing ? soundedBeatIndex : 0;
+      paintDots(holdBeat !== null ? flatIndex(beatIndex, 0) : Math.min(litIndex, dotNodes().length - 1));
+    }
+
+    function updateSubdivButtons() {
+      const g = displayedGrid();
+      subdivBtns.forEach((btn) => {
+        const value = Number(btn.dataset.sub);
+        const on = g === value;
+        btn.classList.toggle("active", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      });
       renderDots();
     }
 
@@ -401,6 +643,10 @@
         trainStatus.textContent = "armed · play starts at " + trainStart;
         return;
       }
+      if (trainerJoinLive) {
+        trainStatus.textContent = "starts next bar · " + trainStart;
+        return;
+      }
       const way = shownPhase === "out" ? "to " + trainTarget : "back to " + trainStart;
       trainStatus.textContent = shownBars + "/" + trainBars + " bars · " + way;
     }
@@ -420,10 +666,11 @@
     function saveState() {
       try {
         localStorage.setItem(BPM_KEY, String(shownBpm));
-        localStorage.setItem(SUB_KEY, String(displayedSubdiv()));
+        localStorage.setItem(SUB_KEY, String(displayedGrid()));
+        localStorage.setItem(GRID_SUB_KEY, JSON.stringify(gridSubs));
+        localStorage.setItem(MUTE_GRID_KEY, JSON.stringify(gridMutes));
         localStorage.setItem(SWING_KEY, displayedSwing() ? "1" : "0");
         localStorage.setItem(DOTS_KEY, extraDots ? "1" : "0");
-        localStorage.setItem(MUTE_KEY, JSON.stringify(mutes));
         localStorage.setItem(SOUND_KEY, soundPreset);
         localStorage.setItem(TRAIN_KEY, JSON.stringify({
           on: trainerOn, start: trainStart, target: trainTarget, bars: trainBars, step: trainStep
@@ -431,24 +678,43 @@
       } catch (error) {}
     }
 
-    function loadMutes(raw) {
+    function loadGridSubs(raw) {
+      const next = defaultSubs();
       try {
         const parsed = JSON.parse(raw);
-        if (
-          parsed &&
-          Array.isArray(parsed[1]) && parsed[1].length === 4 &&
-          Array.isArray(parsed[2]) && parsed[2].length === 8 &&
-          Array.isArray(parsed[4]) && parsed[4].length === 16
-        ) {
-          mutes = {
-            1: parsed[1].map(Boolean),
-            2: parsed[2].map(Boolean),
-            4: parsed[4].map(Boolean)
-          };
-          return;
+        for (const g of SUB_CHOICES) {
+          if (Array.isArray(parsed && parsed[g]) && parsed[g].length === 4) {
+            next[g] = parsed[g].map((n) => SUB_CHOICES.includes(Number(n)) ? Number(n) : g);
+          }
         }
       } catch (error) {}
-      mutes = freshMutes();
+      return next;
+    }
+
+    function loadGridMutes(rawGrid, rawOld) {
+      const next = defaultMutes();
+      try {
+        const parsed = rawGrid ? JSON.parse(rawGrid) : null;
+        if (parsed) {
+          for (const g of SUB_CHOICES) {
+            if (Array.isArray(parsed[g]) && parsed[g].length === 4) {
+              next[g] = parsed[g].map((row, b) => resizeMuteRow(row, gridSubs[g][b]));
+            }
+          }
+          return next;
+        }
+      } catch (error) {}
+      try {
+        const old = rawOld ? JSON.parse(rawOld) : null;
+        if (old) {
+          for (const g of SUB_CHOICES) {
+            if (Array.isArray(old[g]) && old[g].length === 4 * g) {
+              next[g] = [0, 1, 2, 3].map((b) => old[g].slice(b * g, b * g + g).map(Boolean));
+            }
+          }
+        }
+      } catch (error) {}
+      return next;
     }
 
     function clamp(n, min, max) {
@@ -473,8 +739,7 @@
         scheduled = [];
         return;
       }
-      const now = audioCtx.currentTime;
-      scheduled = scheduled.filter((item) => item.time > now);
+      scheduled = scheduled.filter((item) => item.time > audioCtx.currentTime);
     }
 
     function alreadyBooked(time) {
@@ -501,9 +766,13 @@
         gridBpm = pendingBpm;
         pendingBpm = null;
       }
-      if (pendingSubdiv !== null) {
-        gridSubdiv = pendingSubdiv;
-        pendingSubdiv = null;
+      if (pendingGrid !== null) {
+        currentGrid = pendingGrid;
+        pendingGrid = null;
+      }
+      if (pendingGridSubs[currentGrid][beat] !== null) {
+        applyBeatSub(currentGrid, beat, pendingGridSubs[currentGrid][beat]);
+        pendingGridSubs[currentGrid][beat] = null;
       }
       if (pendingSwing !== null) {
         gridSwing = pendingSwing;
@@ -513,8 +782,9 @@
 
     function tickDuration() {
       const beatDur = 60 / gridBpm;
-      if (!gridSwing || gridSubdiv === 1) return beatDur / gridSubdiv;
-      if (gridSubdiv === 2) return sub === 0 ? beatDur * 2 / 3 : beatDur / 3;
+      const n = liveBeatSub(beat);
+      if (!gridSwing || n === 1 || n === 3 || n === 5) return beatDur / n;
+      if (n === 2) return sub === 0 ? beatDur * 2 / 3 : beatDur / 3;
       return (sub % 2 === 0) ? beatDur / 3 : beatDur / 6;
     }
 
@@ -549,7 +819,7 @@
       const step = tickDuration();
       nextNoteTime = atTime + step;
       sub = 1;
-      if (sub >= gridSubdiv) {
+      if (sub >= liveBeatSub(0)) {
         sub = 0;
         beat = 1;
       }
@@ -588,17 +858,38 @@
 
     function setSubdiv(value) {
       if (!playing) {
-        gridSubdiv = value;
-        pendingSubdiv = null;
+        currentGrid = value;
+        pendingGrid = null;
         sub = 0;
         holdBeat = null;
         litIndex = 0;
       } else {
-        pendingSubdiv = value;
+        pendingGrid = value;
         holdBeat = soundedBeatIndex;
         queuePatternChange(true);
       }
-      updateSubdivButtons(value);
+      updateSubdivButtons();
+      saveState();
+    }
+
+    function setBeatSubdiv(beatIndex, value) {
+      const g = displayedGrid();
+      if (playing && g === currentGrid && beatIndex === soundedBeatIndex && soundingMutes[beatIndex] === null) {
+        const liveRow = gridMutes[g] && gridMutes[g][beatIndex];
+        soundingMutes[beatIndex] = Array.isArray(liveRow) ? liveRow.slice() : Array(liveBeatSub(beatIndex)).fill(true);
+      }
+      gridMutes[g][beatIndex] = Array(value).fill(true);
+      if (!playing || g !== currentGrid) {
+        applyBeatSub(g, beatIndex, value);
+        pendingGridSubs[g][beatIndex] = null;
+      } else {
+        pendingGridSubs[g][beatIndex] = value;
+        if (beatIndex === soundedBeatIndex) {
+          holdBeat = soundedBeatIndex;
+          queuePatternChange(true);
+        }
+      }
+      renderDots();
       saveState();
     }
 
@@ -628,14 +919,48 @@
       saveState();
     }
 
+    function stopTrainerKeepPlaying() {
+      trainerRunning = false;
+      trainerJoinLive = false;
+      pendingTrainBpm = null;
+      trainerFirstBar = true;
+      barsDone = 0;
+      shownBars = 0;
+      setTempoLocked(false);
+    }
+
     function toggleTrainer() {
-      trainerOn = !trainerOn;
-      if (trainerOn && !playing) {
+      if (trainerOn) {
+        trainerOn = false;
+        stopTrainerKeepPlaying();
+        updateTrainerButton();
+        trainerStatus();
+        saveState();
+        return;
+      }
+
+      readTrainerFields();
+      trainerOn = true;
+      trainerPhase = "out";
+      trainerFirstBar = true;
+      barsDone = 0;
+      shownBars = 0;
+      shownPhase = "out";
+      pendingTrainBpm = null;
+
+      if (playing) {
+        trainerRunning = true;
+        trainerJoinLive = true;
+        setTempoLocked(true);
+      } else {
+        trainerRunning = false;
+        trainerJoinLive = false;
         bpm = trainStart;
         gridBpm = trainStart;
         pendingBpm = null;
         showBpm(trainStart);
       }
+
       updateTrainerButton();
       trainerStatus();
       saveState();
@@ -673,8 +998,11 @@
 
       if (trainerFirstBar) {
         trainerFirstBar = false;
+        trainerJoinLive = false;
         barsDone = 1;
-        return { bars: 1, phase: trainerPhase, bpm: gridBpm, stop: false, applyBpm: null };
+        const applyBpm = gridBpm !== trainStart ? trainStart : null;
+        if (applyBpm !== null) pendingTrainBpm = applyBpm;
+        return { bars: 1, phase: trainerPhase, bpm: applyBpm || gridBpm, stop: false, applyBpm: applyBpm };
       }
 
       if (barsDone >= trainBars) {
@@ -714,12 +1042,8 @@
     }
 
     async function ensureAudio() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtx.state === "suspended") {
-        await audioCtx.resume();
-      }
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") await audioCtx.resume();
     }
 
     function getNoise() {
@@ -816,26 +1140,24 @@
     function nextTick() {
       nextNoteTime += tickDuration();
       sub += 1;
-      if (sub >= gridSubdiv) {
+      if (sub >= liveBeatSub(beat)) {
+        soundingMutes[beat] = null;
         sub = 0;
         beat = (beat + 1) % 4;
       }
     }
 
     function lightForClick(thisBeat, thisSub) {
-      const n = visualSubdiv();
       if (holdBeat !== null && thisSub !== 0 && thisBeat === holdBeat) {
-        paintDots(thisBeat * n);
+        paintDots(flatIndex(thisBeat, 0));
         return;
       }
-      if (thisSub === 0 && (holdBeat === null || thisBeat !== holdBeat)) {
-        holdBeat = null;
-      }
+      if (thisSub === 0 && (holdBeat === null || thisBeat !== holdBeat)) holdBeat = null;
       if (!extraDots) {
         paintDots(thisBeat);
         return;
       }
-      paintDots(thisBeat * n + thisSub);
+      paintDots(flatIndex(thisBeat, thisSub));
     }
 
     function skipMissedNotes() {
@@ -912,7 +1234,6 @@
       if (playing || starting) return;
       starting = true;
       const request = ++startRequest;
-
       try {
         await ensureAudio();
       } catch (error) {
@@ -920,7 +1241,6 @@
         starting = false;
         return;
       }
-
       starting = false;
       if (request !== startRequest) return;
 
@@ -935,11 +1255,13 @@
         shownPhase = "out";
         showBpm(trainStart);
         trainerRunning = true;
+        trainerJoinLive = false;
         trainerPhase = "out";
         trainerFirstBar = true;
         barsDone = 0;
       } else {
         trainerRunning = false;
+        trainerJoinLive = false;
       }
 
       playing = true;
@@ -947,6 +1269,7 @@
       sub = 0;
       litIndex = 0;
       holdBeat = null;
+      soundingMutes = [null, null, null, null];
       gridBpm = bpm;
       applyPending();
       changeQueued = false;
@@ -969,6 +1292,7 @@
       playing = false;
       starting = false;
       trainerRunning = false;
+      trainerJoinLive = false;
       pendingTrainBpm = null;
       startRequest += 1;
       runId += 1;
@@ -980,10 +1304,24 @@
       sub = 0;
       litIndex = 0;
       holdBeat = null;
+      soundingMutes = [null, null, null, null];
       applyPending();
+      if (pendingGrid !== null) {
+        currentGrid = pendingGrid;
+        pendingGrid = null;
+      }
+      for (const g of SUB_CHOICES) {
+        for (let b = 0; b < 4; b++) {
+          if (pendingGridSubs[g][b] !== null) {
+            applyBeatSub(g, b, pendingGridSubs[g][b]);
+            pendingGridSubs[g][b] = null;
+          }
+        }
+      }
       changeQueued = false;
       gridBpm = bpm;
       renderDots();
+      updateSubdivButtons();
       playBtn.textContent = "play";
       playBtn.classList.remove("stop");
       setTempoLocked(false);
@@ -1003,6 +1341,22 @@
       };
     }
 
+    subdivBtns.forEach((btn) => {
+      const svg = btn.querySelector("svg");
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.dataset.sub = btn.dataset.sub;
+      copy.setAttribute("aria-label", btn.getAttribute("aria-label"));
+      copy.title = btn.title;
+      copy.appendChild(svg.cloneNode(true));
+      copy.onclick = () => {
+        setBeatSubdiv(menuBeat, Number(copy.dataset.sub));
+        hideSubMenu();
+        copy.blur();
+      };
+      subMenu.appendChild(copy);
+    });
+
     bindTap(playBtn, togglePlay);
     bindTap(document.getElementById("minus4"), () => setBpm(bpm - 4));
     bindTap(document.getElementById("minus1"), () => setBpm(bpm - 1));
@@ -1010,16 +1364,33 @@
     bindTap(document.getElementById("plus4"), () => setBpm(bpm + 4));
     bindTap(quarterBtn, () => setSubdiv(1));
     bindTap(eighthBtn, () => setSubdiv(2));
+    bindTap(tripletBtn, () => setSubdiv(3));
     bindTap(sixteenthBtn, () => setSubdiv(4));
+    bindTap(quintupletBtn, () => setSubdiv(5));
     bindTap(swingBtn, setSwing);
     bindTap(trainerBtn, toggleTrainer);
     bindTap(dotsToggle, toggleExtraDots);
     bindTap(muteReset, resetMutes);
+    bindTap(subsReset, resetSubs);
     soundSel.onchange = (e) => setSound(e.target.value);
     slider.oninput = (e) => { if (!trainerRunning) setBpm(e.target.value); };
     [trainStartEl, trainTargetEl, trainBarsEl, trainStepEl].forEach((el) => {
       el.addEventListener("change", readTrainerFields);
       el.addEventListener("blur", readTrainerFields);
+    });
+
+    document.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      if (subMenu.contains(e.target)) return;
+      const beatHit = hitBeat(e);
+      if (beatHit !== null) showSubMenu(e, beatHit);
+      else hideSubMenu();
+    });
+    document.addEventListener("click", (e) => {
+      if (!subMenu.hidden && !subMenu.contains(e.target)) hideSubMenu();
+    });
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Escape") hideSubMenu();
     });
 
     bpmText.addEventListener("focus", () => { if (!trainerRunning) bpmText.select(); });
@@ -1056,28 +1427,15 @@
         if (typingBpm()) return;
         e.preventDefault();
         togglePlay();
-        if (document.activeElement && document.activeElement.blur) {
-          document.activeElement.blur();
-        }
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
         return;
       }
-
       if (trainerRunning) return;
       if (typingBpm() || document.activeElement === slider || document.activeElement === soundSel) return;
-
-      if (e.code === "ArrowUp") {
-        e.preventDefault();
-        setBpm(bpm + 1);
-      } else if (e.code === "ArrowDown") {
-        e.preventDefault();
-        setBpm(bpm - 1);
-      } else if (e.code === "ArrowLeft") {
-        e.preventDefault();
-        setBpm(bpm - 4);
-      } else if (e.code === "ArrowRight") {
-        e.preventDefault();
-        setBpm(bpm + 4);
-      }
+      if (e.code === "ArrowUp") { e.preventDefault(); setBpm(bpm + 1); }
+      else if (e.code === "ArrowDown") { e.preventDefault(); setBpm(bpm - 1); }
+      else if (e.code === "ArrowLeft") { e.preventDefault(); setBpm(bpm - 4); }
+      else if (e.code === "ArrowRight") { e.preventDefault(); setBpm(bpm + 4); }
     });
 
     document.addEventListener("visibilitychange", () => {
@@ -1089,13 +1447,16 @@
     try {
       const savedBpm = localStorage.getItem(BPM_KEY);
       const savedSub = localStorage.getItem(SUB_KEY);
+      const savedGridSubs = localStorage.getItem(GRID_SUB_KEY);
       const savedSwing = localStorage.getItem(SWING_KEY);
       const savedDots = localStorage.getItem(DOTS_KEY);
       const savedMutes = localStorage.getItem(MUTE_KEY);
+      const savedGridMutes = localStorage.getItem(MUTE_GRID_KEY);
       const savedSound = localStorage.getItem(SOUND_KEY);
       const savedTrain = localStorage.getItem(TRAIN_KEY);
       extraDots = savedDots === "1";
-      if (savedMutes) loadMutes(savedMutes);
+      gridSubs = loadGridSubs(savedGridSubs);
+      gridMutes = loadGridMutes(savedGridMutes, savedMutes);
       soundPreset = loadSound(savedSound);
       soundSel.value = soundPreset;
       if (savedTrain) {
@@ -1115,10 +1476,10 @@
       gridBpm = initial;
       showBpm(initial);
       if (!trainerRunning) syncStartFromTempo();
-      if (savedSub === "2" || savedSub === "4") {
-        gridSubdiv = Number(savedSub);
+      if (savedSub === "2" || savedSub === "3" || savedSub === "4" || savedSub === "5") {
+        currentGrid = Number(savedSub);
       }
-      updateSubdivButtons(gridSubdiv);
+      updateSubdivButtons();
       updateDotsToggle();
       updateTrainerButton();
       trainerStatus();
@@ -1129,7 +1490,7 @@
       }
     } catch (error) {
       setBpm(60);
-      updateSubdivButtons(1);
+      updateSubdivButtons();
       updateDotsToggle();
       updateTrainerButton();
     }
