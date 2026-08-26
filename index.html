@@ -30,15 +30,15 @@
       text-align:center;
       font-family:inherit;
       -moz-appearance:textfield;
+      margin-bottom:22px;
     }
     .bpm::-webkit-outer-spin-button,
     .bpm::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-    .label { color:#888; margin:8px 0 22px; }
     .dots { display:flex; justify-content:center; align-items:center; gap:12px; margin-bottom:28px; min-height:48px; }
     button { border:0; border-radius:12px; background:#2a2a2a; color:#fff;
       font-size:18px; font-weight:600; padding:12px 18px; cursor:pointer; }
     button.active { background:#2ec4d6; color:#111; }
-    button:disabled, input[type=range]:disabled, .bpm:read-only {
+    button:disabled, input[type=range]:disabled, .bpm:read-only, .trainer-box input:disabled {
       opacity:0.35;
       cursor:default;
     }
@@ -104,7 +104,7 @@
       position:fixed;
       right:16px;
       bottom:16px;
-      width:210px;
+      width:230px;
       display:grid;
       grid-template-columns: 1fr 1fr;
       gap:8px;
@@ -126,7 +126,14 @@
     }
     .trainer-box input::-webkit-outer-spin-button,
     .trainer-box input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-    .trainer-status { grid-column:1 / -1; text-align:center; color:#666; min-height:16px; }
+    .trainer-status {
+      grid-column:1 / -1;
+      text-align:center;
+      color:#666;
+      height:32px;
+      line-height:16px;
+      overflow:hidden;
+    }
   </style>
 </head>
 <body>
@@ -136,11 +143,11 @@
     <button type="button" class="mute-reset" id="muteReset">reset mutes</button>
     <select id="sound" aria-label="click sound">
       <option value="rim">rim</option>
-      <option value="wood">woodblock</option>
+      <option value="woodblock">woodblock</option>
       <option value="clave">clave</option>
-      <option value="soft">soft triangle</option>
+      <option value="soft triangle">soft triangle</option>
       <option value="sine">sine</option>
-      <option value="crisp">square</option>
+      <option value="square">square</option>
     </select>
   </div>
   <div class="trainer-box">
@@ -149,11 +156,10 @@
     <label>target bpm <input id="trainTarget" type="number" min="40" max="300" value="100" inputmode="numeric"></label>
     <label>bar interval <input id="trainBars" type="number" min="1" max="64" value="8" inputmode="numeric"></label>
     <label>± bpm <input id="trainStep" type="number" min="1" max="32" value="4" inputmode="numeric"></label>
-    <div class="trainer-status" id="trainStatus"></div>
+    <div class="trainer-status" id="trainStatus">&nbsp;</div>
   </div>
   <div class="wrap">
     <input class="bpm" id="bpmText" type="number" min="40" max="300" value="60" inputmode="numeric" autocomplete="off" aria-label="tempo in bpm" />
-    <div class="label">bpm</div>
     <div class="dots" id="dots"></div>
     <div class="row">
       <button type="button" id="minus4">-4</button>
@@ -188,7 +194,8 @@
     const MUTE_KEY = "click-metronome-mutes";
     const SOUND_KEY = "click-metronome-sound";
     const TRAIN_KEY = "click-metronome-trainer-v2";
-    const SOUND_OPTIONS = ["rim", "wood", "clave", "soft", "sine", "crisp"];
+    const SOUND_OPTIONS = ["rim", "woodblock", "clave", "soft triangle", "sine", "square"];
+    const SOUND_LEGACY = { wood: "woodblock", soft: "soft triangle", crisp: "square" };
 
     let bpm = 60;
     let gridBpm = 60;
@@ -197,6 +204,7 @@
     let pendingBpm = null;
     let pendingSubdiv = null;
     let pendingSwing = null;
+    let pendingTrainBpm = null;
     let changeQueued = false;
     let holdBeat = null;
     let extraDots = false;
@@ -366,7 +374,7 @@
     function updateDotsToggle() {
       dotsToggle.classList.toggle("active", extraDots);
       dotsToggle.setAttribute("aria-pressed", extraDots ? "true" : "false");
-      dotsToggle.textContent = extraDots ? "sub dots on" : "sub dots off";
+      dotsToggle.textContent = "sub dots";
       renderDots();
     }
 
@@ -374,6 +382,8 @@
       tempoBtns.forEach((btn) => { btn.disabled = locked; });
       slider.disabled = locked;
       bpmText.readOnly = locked;
+      trainStartEl.disabled = locked;
+      trainTargetEl.disabled = locked;
     }
 
     function updateTrainerButton() {
@@ -384,7 +394,7 @@
 
     function trainerStatus() {
       if (!trainerOn) {
-        trainStatus.textContent = "";
+        trainStatus.innerHTML = "&nbsp;";
         return;
       }
       if (!trainerRunning) {
@@ -451,6 +461,11 @@
       const n = Number(raw);
       if (!Number.isFinite(n) || n < 40 || n > 300) return 60;
       return Math.round(n);
+    }
+
+    function loadSound(raw) {
+      if (SOUND_LEGACY[raw]) return SOUND_LEGACY[raw];
+      return SOUND_OPTIONS.includes(raw) ? raw : "rim";
     }
 
     function keepFutureOnly() {
@@ -524,6 +539,24 @@
       }
     }
 
+    function applyHeardTrainerBpm(newBpm, atTime) {
+      bpm = newBpm;
+      gridBpm = newBpm;
+      pendingBpm = null;
+      pendingTrainBpm = null;
+      beat = 0;
+      sub = 0;
+      const step = tickDuration();
+      nextNoteTime = atTime + step;
+      sub = 1;
+      if (sub >= gridSubdiv) {
+        sub = 0;
+        beat = 1;
+      }
+      changeQueued = false;
+      cancelFrom(atTime + 0.001);
+    }
+
     function setBpm(v) {
       if (trainerRunning) return;
       const next = Math.min(300, Math.max(40, Math.round(Number(v))));
@@ -590,7 +623,7 @@
     }
 
     function setSound(value) {
-      soundPreset = SOUND_OPTIONS.includes(value) ? value : "rim";
+      soundPreset = loadSound(value);
       soundSel.value = soundPreset;
       saveState();
     }
@@ -609,8 +642,10 @@
     }
 
     function readTrainerFields() {
-      trainStart = clamp(trainStartEl.value, 40, 300);
-      trainTarget = clamp(trainTargetEl.value, 40, 300);
+      if (!trainerRunning) {
+        trainStart = clamp(trainStartEl.value, 40, 300);
+        trainTarget = clamp(trainTargetEl.value, 40, 300);
+      }
       trainBars = clamp(trainBarsEl.value, 1, 64);
       trainStep = clamp(trainStepEl.value, 1, 32);
       trainStartEl.value = String(trainStart);
@@ -635,34 +670,38 @@
 
     function trainerTickOnBarOne() {
       if (!trainerRunning || sub !== 0 || beat !== 0) return null;
+
       if (trainerFirstBar) {
         trainerFirstBar = false;
-        return { bars: barsDone, phase: trainerPhase, bpm: gridBpm, stop: false };
+        barsDone = 1;
+        return { bars: 1, phase: trainerPhase, bpm: gridBpm, stop: false, applyBpm: null };
       }
-      barsDone += 1;
+
       if (barsDone >= trainBars) {
-        barsDone = 0;
         if (trainStart === trainTarget) {
-          return { bars: trainBars, phase: trainerPhase, bpm: gridBpm, stop: true };
+          return { bars: trainBars, phase: trainerPhase, bpm: gridBpm, stop: true, applyBpm: null };
         }
+        let nextBpm = gridBpm;
         if (trainerPhase === "out") {
           if (gridBpm === trainTarget) {
             trainerPhase = "back";
-            gridBpm = toward(gridBpm, trainStart, trainStep);
+            nextBpm = toward(gridBpm, trainStart, trainStep);
           } else {
-            gridBpm = toward(gridBpm, trainTarget, trainStep);
+            nextBpm = toward(gridBpm, trainTarget, trainStep);
           }
-          bpm = gridBpm;
-          pendingBpm = null;
         } else if (gridBpm === trainStart) {
-          return { bars: trainBars, phase: trainerPhase, bpm: gridBpm, stop: true };
+          return { bars: trainBars, phase: trainerPhase, bpm: gridBpm, stop: true, applyBpm: null };
         } else {
-          gridBpm = toward(gridBpm, trainStart, trainStep);
-          bpm = gridBpm;
-          pendingBpm = null;
+          nextBpm = toward(gridBpm, trainStart, trainStep);
         }
+        barsDone = 1;
+        const applyBpm = nextBpm !== gridBpm ? nextBpm : null;
+        if (applyBpm !== null) pendingTrainBpm = applyBpm;
+        return { bars: 1, phase: trainerPhase, bpm: nextBpm, stop: false, applyBpm: applyBpm };
       }
-      return { bars: barsDone, phase: trainerPhase, bpm: gridBpm, stop: false };
+
+      barsDone += 1;
+      return { bars: barsDone, phase: trainerPhase, bpm: gridBpm, stop: false, applyBpm: null };
     }
 
     function revealTrainer(snap) {
@@ -692,6 +731,12 @@
       return noiseBuf;
     }
 
+    function dropNodes(nodes) {
+      for (const node of nodes) {
+        try { node.disconnect(); } catch (error) {}
+      }
+    }
+
     function envGain(time, peak, dur) {
       const gain = audioCtx.createGain();
       gain.gain.setValueAtTime(0.0001, time);
@@ -703,9 +748,11 @@
 
     function tone(type, freq, time, peak, dur) {
       const osc = audioCtx.createOscillator();
+      const gain = envGain(time, peak, dur);
       osc.type = type;
       osc.frequency.setValueAtTime(freq, time);
-      osc.connect(envGain(time, peak, dur));
+      osc.connect(gain);
+      osc.onended = () => dropNodes([osc, gain]);
       osc.start(time);
       osc.stop(time + dur + 0.01);
       return osc;
@@ -720,9 +767,11 @@
       const low = audioCtx.createBiquadFilter();
       low.type = "lowpass";
       low.frequency.value = lp;
+      const gain = envGain(time, peak, dur);
       src.connect(high);
       high.connect(low);
-      low.connect(envGain(time, peak, dur));
+      low.connect(gain);
+      src.onended = () => dropNodes([src, high, low, gain]);
       src.start(time);
       src.stop(time + dur + 0.01);
       return src;
@@ -738,14 +787,14 @@
       const vol = isSub ? SUB_VOL : BEAT_VOL;
       const nodes = [];
 
-      if (soundPreset === "soft") {
+      if (soundPreset === "soft triangle") {
         const freq = downbeat ? 1100 : (isSub ? 620 : 750);
         nodes.push(tone("triangle", freq, time, vol * 0.55, 0.05));
-      } else if (soundPreset === "wood") {
+      } else if (soundPreset === "woodblock") {
         const freq = downbeat ? 1250 : (isSub ? 780 : 900);
         nodes.push(tone("triangle", freq, time, vol * 0.35, 0.055));
         nodes.push(noiseBurst(time, vol * 0.22, 0.03, 800, 3500));
-      } else if (soundPreset === "crisp") {
+      } else if (soundPreset === "square") {
         const freq = downbeat ? 1700 : (isSub ? 1050 : 1200);
         nodes.push(tone("square", freq, time, vol * 0.18, 0.028));
       } else if (soundPreset === "rim") {
@@ -802,6 +851,12 @@
         }
         const stepSnap = trainerTickOnBarOne();
         if (stepSnap) snap = stepSnap;
+        if (stepSnap && stepSnap.applyBpm !== null) {
+          bpm = stepSnap.applyBpm;
+          gridBpm = stepSnap.applyBpm;
+          pendingBpm = null;
+          pendingTrainBpm = null;
+        }
         nextTick();
       }
       if (snap) revealTrainer(snap);
@@ -840,6 +895,9 @@
             soundedBeatIndex = thisBeat;
             changeQueued = false;
           }
+          if (trainerSnap && trainerSnap.applyBpm !== null && thisBeat === 0 && thisSub === 0) {
+            applyHeardTrainerBpm(trainerSnap.applyBpm, time);
+          }
           if (trainerSnap) revealTrainer(trainerSnap);
           lightForClick(thisBeat, thisSub);
         }, delay);
@@ -871,8 +929,9 @@
         bpm = trainStart;
         gridBpm = trainStart;
         pendingBpm = null;
+        pendingTrainBpm = null;
         shownBpm = trainStart;
-        shownBars = 0;
+        shownBars = 1;
         shownPhase = "out";
         showBpm(trainStart);
         trainerRunning = true;
@@ -910,6 +969,7 @@
       playing = false;
       starting = false;
       trainerRunning = false;
+      pendingTrainBpm = null;
       startRequest += 1;
       runId += 1;
       clearTimeout(timerId);
@@ -1036,7 +1096,7 @@
       const savedTrain = localStorage.getItem(TRAIN_KEY);
       extraDots = savedDots === "1";
       if (savedMutes) loadMutes(savedMutes);
-      soundPreset = SOUND_OPTIONS.includes(savedSound) ? savedSound : "rim";
+      soundPreset = loadSound(savedSound);
       soundSel.value = soundPreset;
       if (savedTrain) {
         const t = JSON.parse(savedTrain);
