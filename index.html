@@ -401,7 +401,7 @@
         trainStatus.textContent = "armed · play starts at " + trainStart;
         return;
       }
-      const way = shownPhase === "out" ? "up to " + trainTarget : "back to " + trainStart;
+      const way = shownPhase === "out" ? "to " + trainTarget : "back to " + trainStart;
       trainStatus.textContent = shownBars + "/" + trainBars + " bars · " + way;
     }
 
