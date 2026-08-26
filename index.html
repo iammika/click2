@@ -42,12 +42,31 @@
     .dots {
       display:flex;
       justify-content:center;
-      align-items:center;
+      align-items:flex-end;
       gap:12px;
       margin-bottom:28px;
       min-height:48px;
       flex-wrap:nowrap;
     }
+    .slot {
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:flex-end;
+      gap:6px;
+    }
+    .accent, .accent-spacer {
+      width:24px;
+      height:16px;
+      padding:0;
+      min-width:24px;
+      min-height:16px;
+      border-radius:0;
+      background:transparent;
+      color:#c4c4c4;
+    }
+    .accent-spacer { pointer-events:none; visibility:hidden; }
+    .accent.off { color:#555; }
     button { border:0; border-radius:12px; background:#2a2a2a; color:#fff;
       font-size:18px; font-weight:600; padding:12px 18px; cursor:pointer; }
     button.active { background:#2ec4d6; color:#111; }
@@ -73,6 +92,7 @@
       height:24px;
       min-width:24px;
       min-height:24px;
+      margin-bottom:12px;
       background:#2a2a2a;
     }
     .dot.on { background:#2ec4d6; }
@@ -154,7 +174,7 @@
       gap:8px;
       width:150px;
     }
-    .dots-toggle, .mute-reset, .subs-reset {
+    .dots-toggle, .mute-reset, .subs-reset, .accent-reset {
       font-size:13px;
       padding:8px 12px;
       border-radius:999px;
@@ -201,6 +221,8 @@
     <button type="button" class="dots-toggle" id="dotsToggle" aria-pressed="false">sub dots</button>
     <button type="button" class="mute-reset" id="muteReset">reset mutes</button>
     <button type="button" class="subs-reset" id="subsReset">reset subs</button>
+    <button type="button" class="accent-reset" id="accentReset">reset accents</button>
+    <button type="button" class="accent-reset" id="accentOne">accent 1</button>
     <select id="sound" aria-label="click sound">
       <option value="rim">rim</option>
       <option value="woodblock">woodblock</option>
@@ -313,11 +335,14 @@
     const DOTS_KEY = "click-metronome-extra-dots";
     const MUTE_KEY = "click-metronome-mutes";
     const MUTE_GRID_KEY = "click-metronome-grid-mutes";
+    const ACCENT_KEY = "click-metronome-accents";
+    const ACCENT_ONE_KEY = "click-metronome-accent-one";
     const SOUND_KEY = "click-metronome-sound";
     const TRAIN_KEY = "click-metronome-trainer-v2";
     const SOUND_OPTIONS = ["rim", "woodblock", "clave", "soft triangle", "sine", "square"];
     const SOUND_LEGACY = { wood: "woodblock", soft: "soft triangle", crisp: "square" };
     const SUB_CHOICES = [1, 2, 3, 4, 5];
+    const ACCENT_SVG = '<svg viewBox="0 0 24 16" width="24" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3 L20 8 L4 13"/></svg>';
 
     function defaultSubs() {
       return { 1: [1, 1, 1, 1], 2: [2, 2, 2, 2], 3: [3, 3, 3, 3], 4: [4, 4, 4, 4], 5: [5, 5, 5, 5] };
@@ -329,6 +354,9 @@
       const out = {};
       for (const n of SUB_CHOICES) out[n] = [0, 1, 2, 3].map(() => Array(n).fill(true));
       return out;
+    }
+    function defaultAccents() {
+      return [true, true, true, true];
     }
     function resizeMuteRow(row, len) {
       const next = Array.isArray(row) ? row.map(Boolean) : [];
@@ -344,6 +372,8 @@
     let pendingGridSubs = emptyPendingSubs();
     let gridMutes = defaultMutes();
     let soundingMutes = [null, null, null, null];
+    let accents = defaultAccents();
+    let accentOne = true;
     let gridSwing = false;
     let pendingBpm = null;
     let pendingSwing = null;
@@ -398,6 +428,8 @@
     const dotsToggle = document.getElementById("dotsToggle");
     const muteReset = document.getElementById("muteReset");
     const subsReset = document.getElementById("subsReset");
+    const accentReset = document.getElementById("accentReset");
+    const accentOneBtn = document.getElementById("accentOne");
     const soundSel = document.getElementById("sound");
     const dotsBox = document.getElementById("dots");
     const subMenu = document.getElementById("subMenu");
@@ -459,7 +491,32 @@
       const row = gridMutes[grid][beatIndex];
       if (slot < 0 || slot >= row.length) return;
       row[slot] = !row[slot];
+      if (playing && grid === currentGrid) rescheduleUpcomingBeat(beatIndex);
       renderDots();
+      saveState();
+    }
+
+    function toggleAccent(beatIndex) {
+      accents[beatIndex] = !accents[beatIndex];
+      if (playing) rescheduleUpcomingBeat(beatIndex);
+      renderDots();
+      saveState();
+    }
+
+    function resetAccents() {
+      accents = defaultAccents();
+      renderDots();
+      saveState();
+    }
+
+    function updateAccentOne() {
+      accentOneBtn.classList.toggle("active", accentOne);
+      accentOneBtn.setAttribute("aria-pressed", accentOne ? "true" : "false");
+    }
+
+    function toggleAccentOne() {
+      accentOne = !accentOne;
+      updateAccentOne();
       saveState();
     }
 
@@ -546,6 +603,7 @@
     }
 
     function hitBeat(event) {
+      if (event.target.closest(".accent")) return null;
       const nodes = dotNodes();
       if (!nodes.length) return null;
       const boxes = nodes.map((node) => ({ beat: Number(node.dataset.beat), box: node.getBoundingClientRect() }));
@@ -579,6 +637,25 @@
       for (let b = 0; b < 4; b++) {
         const n = extraDots ? shownBeatSub(b, g) : 1;
         for (let s = 0; s < n; s++) {
+          const slot = document.createElement("div");
+          slot.className = "slot";
+          if (s === 0) {
+            const accentBtn = document.createElement("button");
+            accentBtn.type = "button";
+            accentBtn.className = "accent" + (accents[b] ? "" : " off");
+            accentBtn.innerHTML = ACCENT_SVG;
+            accentBtn.setAttribute("aria-label", accents[b] ? "turn off accent" : "turn on accent");
+            accentBtn.setAttribute("aria-pressed", accents[b] ? "true" : "false");
+            accentBtn.onclick = () => {
+              toggleAccent(b);
+              accentBtn.blur();
+            };
+            slot.appendChild(accentBtn);
+          } else {
+            const spacer = document.createElement("div");
+            spacer.className = "accent-spacer";
+            slot.appendChild(spacer);
+          }
           const el = document.createElement("button");
           el.type = "button";
           el.className = "dot" + (s === 0 ? "" : " small");
@@ -590,7 +667,8 @@
             toggleMute(g, b, extraDots ? s : 0);
             el.blur();
           };
-          dotsBox.appendChild(el);
+          slot.appendChild(el);
+          dotsBox.appendChild(slot);
         }
       }
       const beatIndex = playing ? soundedBeatIndex : 0;
@@ -669,6 +747,8 @@
         localStorage.setItem(SUB_KEY, String(displayedGrid()));
         localStorage.setItem(GRID_SUB_KEY, JSON.stringify(gridSubs));
         localStorage.setItem(MUTE_GRID_KEY, JSON.stringify(gridMutes));
+        localStorage.setItem(ACCENT_KEY, JSON.stringify(accents));
+        localStorage.setItem(ACCENT_ONE_KEY, accentOne ? "1" : "0");
         localStorage.setItem(SWING_KEY, displayedSwing() ? "1" : "0");
         localStorage.setItem(DOTS_KEY, extraDots ? "1" : "0");
         localStorage.setItem(SOUND_KEY, soundPreset);
@@ -676,6 +756,14 @@
           on: trainerOn, start: trainStart, target: trainTarget, bars: trainBars, step: trainStep
         }));
       } catch (error) {}
+    }
+
+    function loadAccents(raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length === 4) return parsed.map(Boolean);
+      } catch (error) {}
+      return defaultAccents();
     }
 
     function loadGridSubs(raw) {
@@ -796,6 +884,30 @@
       return t;
     }
 
+    function upcomingBeatStart(beatIndex) {
+      if (!playing || !audioCtx) return null;
+      if (beatIndex === soundedBeatIndex) return null;
+      const beatDur = 60 / gridBpm;
+      let start = soundedBeatStart + beatDur;
+      let b = (soundedBeatIndex + 1) % 4;
+      while (b !== beatIndex) {
+        start += beatDur;
+        b = (b + 1) % 4;
+      }
+      return start;
+    }
+
+    function rescheduleUpcomingBeat(beatIndex) {
+      const start = upcomingBeatStart(beatIndex);
+      if (start === null) return;
+      cancelFrom(start);
+      if (nextNoteTime > start - 0.0005) {
+        nextNoteTime = start;
+        beat = beatIndex;
+        sub = 0;
+      }
+    }
+
     function queuePatternChange(needCancel) {
       if (!playing || !audioCtx || changeQueued) return;
       changeQueued = true;
@@ -882,12 +994,14 @@
       if (!playing || g !== currentGrid) {
         applyBeatSub(g, beatIndex, value);
         pendingGridSubs[g][beatIndex] = null;
-      } else {
+      } else if (beatIndex === soundedBeatIndex) {
         pendingGridSubs[g][beatIndex] = value;
-        if (beatIndex === soundedBeatIndex) {
-          holdBeat = soundedBeatIndex;
-          queuePatternChange(true);
-        }
+        holdBeat = soundedBeatIndex;
+        queuePatternChange(true);
+      } else {
+        applyBeatSub(g, beatIndex, value);
+        pendingGridSubs[g][beatIndex] = null;
+        rescheduleUpcomingBeat(beatIndex);
       }
       renderDots();
       saveState();
@@ -1106,31 +1220,31 @@
       keepFutureOnly();
     }
 
-    function scheduleClick(time, downbeat, isSub) {
+    function scheduleClick(time, accented, isSub) {
       if (alreadyBooked(time)) return;
       const vol = isSub ? SUB_VOL : BEAT_VOL;
       const nodes = [];
 
       if (soundPreset === "soft triangle") {
-        const freq = downbeat ? 1100 : (isSub ? 620 : 750);
+        const freq = accented ? 1100 : (isSub ? 620 : 750);
         nodes.push(tone("triangle", freq, time, vol * 0.55, 0.05));
       } else if (soundPreset === "woodblock") {
-        const freq = downbeat ? 1250 : (isSub ? 780 : 900);
+        const freq = accented ? 1250 : (isSub ? 780 : 900);
         nodes.push(tone("triangle", freq, time, vol * 0.35, 0.055));
         nodes.push(noiseBurst(time, vol * 0.22, 0.03, 800, 3500));
       } else if (soundPreset === "square") {
-        const freq = downbeat ? 1700 : (isSub ? 1050 : 1200);
+        const freq = accented ? 1700 : (isSub ? 1050 : 1200);
         nodes.push(tone("square", freq, time, vol * 0.18, 0.028));
       } else if (soundPreset === "rim") {
-        const freq = downbeat ? 1600 : 1100;
+        const freq = accented ? 1600 : 1100;
         nodes.push(noiseBurst(time, vol * (isSub ? 0.16 : 0.28), isSub ? 0.018 : 0.028, 1500, 6000));
         nodes.push(tone("triangle", freq, time, vol * 0.12, 0.03));
       } else if (soundPreset === "clave") {
-        const freq = downbeat ? 2100 : (isSub ? 1400 : 1650);
+        const freq = accented ? 2100 : (isSub ? 1400 : 1650);
         nodes.push(tone("triangle", freq, time, vol * 0.45, 0.022));
         nodes.push(tone("sine", freq * 1.5, time, vol * 0.12, 0.016));
       } else {
-        const freq = downbeat ? 1400 : 1000;
+        const freq = accented ? 1400 : 1000;
         nodes.push(tone("sine", freq, time, vol, CLICK_LEN));
       }
 
@@ -1197,8 +1311,8 @@
         const thisBeat = beat;
         const thisSub = sub;
         const time = nextNoteTime;
-        const isDownbeat = thisBeat === 0 && thisSub === 0;
-        const isSubClick = thisSub !== 0;
+        const isSubClick = thisSub !== 0 || !accents[thisBeat];
+        const isAccent = thisSub === 0 && accents[thisBeat] && thisBeat === 0 && accentOne;
 
         if (thisSub === 0) {
           schedBeatStart = time;
@@ -1206,7 +1320,7 @@
         }
 
         if (time >= audioCtx.currentTime - LATE_SLACK && clickEnabled(thisBeat, thisSub)) {
-          scheduleClick(time, isDownbeat, isSubClick);
+          scheduleClick(time, isAccent, isSubClick);
         }
 
         const delay = Math.max(0, (time - audioCtx.currentTime) * 1000);
@@ -1372,6 +1486,8 @@
     bindTap(dotsToggle, toggleExtraDots);
     bindTap(muteReset, resetMutes);
     bindTap(subsReset, resetSubs);
+    bindTap(accentReset, resetAccents);
+    bindTap(accentOneBtn, toggleAccentOne);
     soundSel.onchange = (e) => setSound(e.target.value);
     slider.oninput = (e) => { if (!trainerRunning) setBpm(e.target.value); };
     [trainStartEl, trainTargetEl, trainBarsEl, trainStepEl].forEach((el) => {
@@ -1452,11 +1568,14 @@
       const savedDots = localStorage.getItem(DOTS_KEY);
       const savedMutes = localStorage.getItem(MUTE_KEY);
       const savedGridMutes = localStorage.getItem(MUTE_GRID_KEY);
+      const savedAccents = localStorage.getItem(ACCENT_KEY);
       const savedSound = localStorage.getItem(SOUND_KEY);
       const savedTrain = localStorage.getItem(TRAIN_KEY);
       extraDots = savedDots === "1";
       gridSubs = loadGridSubs(savedGridSubs);
       gridMutes = loadGridMutes(savedGridMutes, savedMutes);
+      accents = loadAccents(savedAccents);
+      accentOne = localStorage.getItem(ACCENT_ONE_KEY) !== "0";
       soundPreset = loadSound(savedSound);
       soundSel.value = soundPreset;
       if (savedTrain) {
@@ -1482,6 +1601,7 @@
       updateSubdivButtons();
       updateDotsToggle();
       updateTrainerButton();
+      updateAccentOne();
       trainerStatus();
       saveState();
       if (savedSwing === "1") {
@@ -1493,6 +1613,7 @@
       updateSubdivButtons();
       updateDotsToggle();
       updateTrainerButton();
+      updateAccentOne();
     }
   </script>
 </body>
