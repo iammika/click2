@@ -46,10 +46,40 @@
       display:flex;
       justify-content:center;
       align-items:flex-end;
-      gap:12px;
+      align-content:flex-end;
+      gap:12px 12px;
       margin-bottom:28px;
       min-height:48px;
+      flex-wrap:wrap;
+      width:100%;
+    }
+    .beat-group {
+      position:relative;
+      display:flex;
       flex-wrap:nowrap;
+      flex:0 0 auto;
+      align-items:flex-end;
+      gap:12px;
+    }
+    .beat-slots {
+      display:flex;
+      flex-wrap:nowrap;
+      align-items:flex-end;
+      gap:12px;
+    }
+    .tuplet-bracket {
+      position:absolute;
+      left:0;
+      right:0;
+      top:100%;
+      height:10px;
+      margin-top:4px;
+      border-bottom:2px solid #888;
+      border-left:2px solid #888;
+      border-right:2px solid #888;
+      border-top:0;
+      box-sizing:border-box;
+      pointer-events:none;
     }
     .slot {
       display:flex;
@@ -101,6 +131,21 @@
     .dot.on { background:#2ec4d6; }
     .dot.muted { background:#1a1a1a; box-shadow:inset 0 0 0 2px #555; }
     .dot.muted.on { background:#164e56; box-shadow:inset 0 0 0 2px #2ec4d6; }
+    .dot.unit-mark {
+      position:relative;
+      padding:0 !important;
+      color:#c4c4c4;
+    }
+    .dot.unit-mark .unit-icon {
+      position:absolute;
+      left:50%;
+      top:50%;
+      width:20px;
+      height:20px;
+      transform:translate(-50%,-50%);
+      pointer-events:none;
+    }
+    .dot.unit-mark.on { color:#111; }
     .play { width:100%; border-radius:999px; padding:16px; font-size:22px; background:#1f8a4c; }
     .play.stop { background:#4a5d6e; }
     .row { display:flex; justify-content:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
@@ -141,25 +186,41 @@
     .sub-menu {
       position:fixed;
       z-index:80;
-      display:flex;
-      flex-direction:column;
+      display:grid;
+      grid-template-columns:52px 52px;
+      grid-template-rows:38px repeat(4, 38px);
+      align-items:stretch;
+      justify-items:stretch;
       overflow:hidden;
       border-radius:12px;
       background:#1a1a1a;
       box-shadow:0 8px 24px rgba(0,0,0,0.45);
     }
     .sub-menu[hidden] { display:none; }
+    .sub-menu button[data-sub] { grid-column:1; }
+    .sub-menu button[data-plus] { grid-column:2; grid-row:1; }
+    .sub-menu button[data-minus] { grid-column:2; grid-row:2; }
+    .sub-menu.one-col {
+      grid-template-columns:52px;
+    }
+    .sub-menu.one-col button[data-plus],
+    .sub-menu.one-col button[data-minus] { display:none; }
     .sub-menu button {
       display:flex;
       align-items:center;
       justify-content:center;
       border-radius:0;
-      padding:8px 12px;
-      min-width:52px;
+      padding:0;
+      margin:0;
+      width:100%;
+      height:100%;
+      min-width:0;
+      min-height:0;
       background:#2a2a2a;
-      box-shadow:inset 0 -1px 0 #111;
+      box-shadow:inset -1px 0 0 #111, inset 0 -1px 0 #111;
     }
-    .sub-menu button:last-child { box-shadow:none; }
+    .sub-menu button[data-plus],
+    .sub-menu button[data-minus] { font-size:20px; line-height:1; }
     .sub-menu button:hover { background:#3a3a3a; }
     .sub-menu button.active { background:#2ec4d6; color:#111; }
     .sub-menu button.active:hover { background:#2ec4d6; color:#111; }
@@ -190,6 +251,28 @@
       gap:8px;
       width:150px;
     }
+    .beats-box {
+      position:fixed;
+      top:50%;
+      left:16px;
+      transform:translateY(-50%);
+      width:44px;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+      border-radius:12px;
+      background:#1a1a1a;
+    }
+    .beats-box button {
+      border-radius:0;
+      padding:7px 0;
+      min-width:0;
+      font-size:14px;
+      background:#2a2a2a;
+      box-shadow:inset 0 -1px 0 #111;
+    }
+    .beats-box button:last-child { box-shadow:none; }
+    .beats-box button.active { background:#2ec4d6; color:#111; }
     .dots-toggle, .mute-reset, .subs-reset, .accent-reset {
       font-size:13px;
       padding:8px 12px;
@@ -233,12 +316,18 @@
 </head>
 <body>
   <h1 class="logo">click2</h1>
+  <div class="beats-box" id="beatsBox" role="group" aria-label="beats in a bar">
+    <button type="button" data-beats="2">2</button>
+    <button type="button" data-beats="3">3</button>
+    <button type="button" data-beats="4">4</button>
+    <button type="button" data-beats="5">5</button>
+    <button type="button" data-beats="6">6</button>
+    <button type="button" data-beats="7">7</button>
+  </div>
   <div class="corner">
     <button type="button" class="dots-toggle" id="dotsToggle" aria-pressed="false">sub dots</button>
-    <button type="button" class="mute-reset" id="muteReset">reset mutes</button>
-    <button type="button" class="subs-reset" id="subsReset">reset subs</button>
-    <button type="button" class="accent-reset" id="accentReset">reset accents</button>
     <button type="button" class="accent-reset" id="accentOne">accent 1</button>
+    <button type="button" class="mute-reset" id="patternReset">reset</button>
     <select id="sound" aria-label="click sound">
       <option value="rim">rim</option>
       <option value="woodblock">woodblock</option>
@@ -354,29 +443,98 @@
     const ACCENT_ONE_KEY = "click-metronome-accent-one";
     const SOUND_KEY = "click-metronome-sound";
     const TRAIN_KEY = "click-metronome-trainer-v2";
+    const BEATS_KEY = "click-metronome-beats";
+    const UNIT_KEY = "click-metronome-beat-units";
+    const MIN_BEATS = 2;
+    const MAX_BEATS = 7;
     const SOUND_OPTIONS = ["rim", "woodblock", "clave", "soft triangle", "sine", "square"];
     const SOUND_LEGACY = { wood: "woodblock", soft: "soft triangle", crisp: "square" };
     const SUB_CHOICES = [1, 2, 3, 4, 5];
     const ACCENT_SVG = '<svg viewBox="0 0 24 16" width="24" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3 L20 8 L4 13"/></svg>';
 
-    function defaultSubs() {
-      return { 1: [1, 1, 1, 1], 2: [2, 2, 2, 2], 3: [3, 3, 3, 3], 4: [4, 4, 4, 4], 5: [5, 5, 5, 5] };
-    }
-    function emptyPendingSubs() {
-      return { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null, null, null], 5: [null, null, null, null] };
-    }
-    function defaultMutes() {
+    function defaultSubs(n) {
+      n = n || 4;
       const out = {};
-      for (const n of SUB_CHOICES) out[n] = [0, 1, 2, 3].map(() => Array(n).fill(true));
+      for (const g of SUB_CHOICES) out[g] = Array.from({ length: n }, () => g);
       return out;
     }
-    function defaultAccents() {
-      return [true, true, true, true];
+    function emptyPendingSubs(n) {
+      n = n || 4;
+      const out = {};
+      for (const g of SUB_CHOICES) out[g] = Array.from({ length: n }, () => null);
+      return out;
+    }
+    function defaultMutes(n) {
+      n = n || 4;
+      const out = {};
+      for (const g of SUB_CHOICES) out[g] = Array.from({ length: n }, () => Array(g).fill(true));
+      return out;
+    }
+    function defaultAccents(n) {
+      return Array.from({ length: n || 4 }, () => true);
     }
     function resizeMuteRow(row, len) {
       const next = Array.isArray(row) ? row.map(Boolean) : [];
       while (next.length < len) next.push(true);
       return next.slice(0, len);
+    }
+
+    function resizeToBeats(n) {
+      n = clamp(n, MIN_BEATS, MAX_BEATS);
+      for (const g of SUB_CHOICES) {
+        if (!gridSubs[g]) gridSubs[g] = [];
+        while (gridSubs[g].length < n) gridSubs[g].push(g);
+        if (!pendingGridSubs[g]) pendingGridSubs[g] = [];
+        while (pendingGridSubs[g].length < n) pendingGridSubs[g].push(null);
+        if (!gridMutes[g]) gridMutes[g] = [];
+        while (gridMutes[g].length < n) gridMutes[g].push(Array(g).fill(true));
+      }
+      while (accents.length < n) accents.push(true);
+      while (soundingMutes.length < n) soundingMutes.push(null);
+      while (gridUnits.length < n) gridUnits.push(2);
+      while (pendingUnits.length < n) pendingUnits.push(null);
+      if (holdBeat !== null && holdBeat >= n) holdBeat = null;
+    }
+
+    function showBeats(n) {
+      shownBeats = n;
+      beatBtns.forEach((btn) => {
+        const on = Number(btn.dataset.beats) === n;
+        btn.classList.toggle("active", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    }
+
+    function applyBeatsAtAdvance() {
+      if (pendingBeats === null) return;
+      beatsPerBar = pendingBeats;
+      pendingBeats = null;
+      resizeToBeats(beatsPerBar);
+    }
+
+    function setBeats(v) {
+      const next = clamp(v, MIN_BEATS, MAX_BEATS);
+      showBeats(next);
+      if (!playing) {
+        beatsPerBar = next;
+        pendingBeats = null;
+        resizeToBeats(next);
+      } else {
+        if (next > beatsPerBar) resizeToBeats(next);
+        pendingBeats = next;
+        meterEpoch += 1;
+        const end = soundedBeatStart + beatLength(soundedBeatIndex);
+        cancelFrom(end);
+        if (nextNoteTime > end - 0.0005) {
+          nextNoteTime = end;
+          sub = 0;
+          beat = soundedBeatIndex + 1;
+          applyBeatsAtAdvance();
+          if (beat >= beatsPerBar) beat = 0;
+        }
+      }
+      renderDots();
+      saveState();
     }
 
     let bpm = 60;
@@ -387,7 +545,13 @@
     let pendingGridSubs = emptyPendingSubs();
     let gridMutes = defaultMutes();
     let soundingMutes = [null, null, null, null];
-    let accents = defaultAccents();
+    let beatsPerBar = 4;
+    let pendingBeats = null;
+    let shownBeats = 4;
+    let meterEpoch = 0;
+    let gridUnits = [2, 2, 2, 2, 2, 2, 2];
+    let pendingUnits = [null, null, null, null, null, null, null];
+    let accents = defaultAccents(4);
     let accentOne = true;
     let gridSwing = false;
     let pendingBpm = null;
@@ -441,9 +605,7 @@
     const swingBtn = document.getElementById("swing");
     const trainerBtn = document.getElementById("trainerBtn");
     const dotsToggle = document.getElementById("dotsToggle");
-    const muteReset = document.getElementById("muteReset");
-    const subsReset = document.getElementById("subsReset");
-    const accentReset = document.getElementById("accentReset");
+    const patternReset = document.getElementById("patternReset");
     const accentOneBtn = document.getElementById("accentOne");
     const soundSel = document.getElementById("sound");
     const dotsBox = document.getElementById("dots");
@@ -453,6 +615,7 @@
     const trainBarsEl = document.getElementById("trainBars");
     const trainStepEl = document.getElementById("trainStep");
     const trainStatus = document.getElementById("trainStatus");
+    const beatBtns = [...document.querySelectorAll("#beatsBox button")];
     const tempoBtns = [
       document.getElementById("minus4"),
       document.getElementById("minus1"),
@@ -474,6 +637,85 @@
       const g = grid || displayedGrid();
       if (pendingGridSubs[g][b] !== null) return pendingGridSubs[g][b];
       return gridSubs[g][b] || g;
+    }
+
+    function clampUnit(u) {
+      u = Number(u);
+      if (u === 1 || u === 3) return u;
+      return 2;
+    }
+
+    function shownUnit(b) {
+      if (pendingUnits[b] != null) return clampUnit(pendingUnits[b]);
+      return clampUnit(gridUnits[b]);
+    }
+
+    function liveUnit(b) {
+      if (pendingUnits[b] != null && b !== soundedBeatIndex) return clampUnit(pendingUnits[b]);
+      return clampUnit(gridUnits[b]);
+    }
+
+    function isAlteredShown(b) { return shownUnit(b) !== 2; }
+    function isAlteredLive(b) { return liveUnit(b) !== 2; }
+
+    function slotsOnBeat(b, grid) {
+      const g = grid || displayedGrid();
+      const u = shownUnit(b);
+      const sub = shownBeatSub(b, g);
+      if (u !== 2) {
+        if (!extraDots || sub === 1) return 1;
+        if (sub === 4) return u === 1 ? 2 : 6;
+        return u === 1 ? 1 : 3;
+      }
+      return extraDots ? sub : 1;
+    }
+
+    function liveSlots(b) {
+      const u = liveUnit(b);
+      const sub = liveBeatSub(b);
+      if (u !== 2) {
+        if (sub === 1) return 1;
+        if (sub === 4) return u === 1 ? 2 : 6;
+        return u === 1 ? 1 : 3;
+      }
+      return sub;
+    }
+
+    function beatLength(b) {
+      return (60 / gridBpm) * (liveUnit(b) / 2);
+    }
+
+    function muteLen(b, g) {
+      const u = pendingUnits[b] != null ? clampUnit(pendingUnits[b]) : clampUnit(gridUnits[b]);
+      const sub = shownBeatSub(b, g);
+      if (u === 1) return sub === 4 ? 2 : 1;
+      if (u === 3) {
+        if (sub === 1) return 1;
+        if (sub === 4) return 6;
+        return 3;
+      }
+      return sub;
+    }
+
+    function nudgeUnit(b, dir) {
+      const next = Math.max(1, Math.min(3, shownUnit(b) + dir));
+      if (next === shownUnit(b)) return;
+      if (!playing) {
+        gridUnits[b] = next;
+        pendingUnits[b] = null;
+      } else if (b === soundedBeatIndex) {
+        pendingUnits[b] = next;
+      } else {
+        gridUnits[b] = next;
+        pendingUnits[b] = null;
+        rescheduleUpcomingBeat(b);
+      }
+      for (const g of SUB_CHOICES) {
+        if (!gridMutes[g]) gridMutes[g] = [];
+        gridMutes[g][b] = resizeMuteRow([], muteLen(b, g));
+      }
+      renderDots();
+      saveState();
     }
 
     function liveBeatSub(b) {
@@ -519,7 +761,7 @@
     }
 
     function resetAccents() {
-      accents = defaultAccents();
+      accents = defaultAccents(shownBeats);
       renderDots();
       saveState();
     }
@@ -542,10 +784,10 @@
     }
 
     function resetMutes() {
-      gridMutes = defaultMutes();
-      soundingMutes = [null, null, null, null];
+      gridMutes = defaultMutes(shownBeats);
+      soundingMutes = Array.from({ length: shownBeats }, () => null);
       for (const g of SUB_CHOICES) {
-        for (let b = 0; b < 4; b++) {
+        for (let b = 0; b < shownBeats; b++) {
           gridMutes[g][b] = resizeMuteRow([], shownBeatSub(b, g));
         }
       }
@@ -556,12 +798,22 @@
     function resetSubs() {
       for (const g of SUB_CHOICES) {
         if (playing && g === currentGrid) {
-          pendingGridSubs[g] = [g, g, g, g];
-          for (let b = 0; b < 4; b++) gridMutes[g][b] = Array(g).fill(true);
+          pendingGridSubs[g] = Array.from({ length: shownBeats }, () => g);
+          for (let b = 0; b < shownBeats; b++) gridMutes[g][b] = Array(g).fill(true);
         } else {
-          gridSubs[g] = [g, g, g, g];
-          pendingGridSubs[g] = [null, null, null, null];
-          for (let b = 0; b < 4; b++) gridMutes[g][b] = Array(g).fill(true);
+          gridSubs[g] = Array.from({ length: shownBeats }, () => g);
+          pendingGridSubs[g] = Array.from({ length: shownBeats }, () => null);
+          for (let b = 0; b < shownBeats; b++) gridMutes[g][b] = Array(g).fill(true);
+        }
+      }
+      if (playing) pendingUnits = gridUnits.map(() => 2);
+      else {
+        gridUnits = gridUnits.map(() => 2);
+        pendingUnits = gridUnits.map(() => null);
+      }
+      for (const g of SUB_CHOICES) {
+        for (let b = 0; b < gridUnits.length; b++) {
+          if (gridMutes[g] && gridMutes[g][b]) gridMutes[g][b] = resizeMuteRow([], muteLen(b, g));
         }
       }
       if (playing) {
@@ -572,10 +824,15 @@
       saveState();
     }
 
+    function resetPattern() {
+      resetSubs();
+      resetAccents();
+    }
+
     function flatIndex(thisBeat, thisSub) {
       if (!extraDots) return thisBeat;
       let i = 0;
-      for (let b = 0; b < thisBeat; b++) i += shownBeatSub(b);
+      for (let b = 0; b < thisBeat; b++) i += slotsOnBeat(b);
       return i + thisSub;
     }
 
@@ -586,9 +843,19 @@
     function paintDots(index) {
       const nodes = dotNodes();
       if (!nodes.length) return;
+      const g = displayedGrid();
+      if (index < 0) {
+        litIndex = -1;
+        nodes.forEach((d) => {
+          const beatIndex = Number(d.dataset.beat);
+          const slot = Number(d.dataset.slot);
+          d.classList.toggle("on", false);
+          d.classList.toggle("muted", !slotOn(g, beatIndex, extraDots ? slot : 0));
+        });
+        return;
+      }
       const safe = Math.max(0, Math.min(index, nodes.length - 1));
       litIndex = safe;
-      const g = displayedGrid();
       nodes.forEach((d, i) => {
         const beatIndex = Number(d.dataset.beat);
         const slot = Number(d.dataset.slot);
@@ -604,7 +871,21 @@
     function showSubMenu(event, beatIndex) {
       menuBeat = beatIndex;
       const current = shownBeatSub(beatIndex);
-      [...subMenu.children].forEach((btn) => {
+      const tuplet = current === 3 || current === 5;
+      subMenu.classList.toggle("one-col", tuplet);
+      subMenu.querySelectorAll("button").forEach((btn) => {
+        if (btn.dataset.plus === "1") {
+          const on = shownUnit(beatIndex) === 3;
+          btn.classList.toggle("active", on);
+          btn.setAttribute("aria-pressed", on ? "true" : "false");
+          return;
+        }
+        if (btn.dataset.minus === "1") {
+          const on = shownUnit(beatIndex) === 1;
+          btn.classList.toggle("active", on);
+          btn.setAttribute("aria-pressed", on ? "true" : "false");
+          return;
+        }
         const value = Number(btn.dataset.sub);
         btn.classList.toggle("active", value === current);
         btn.setAttribute("aria-pressed", value === current ? "true" : "false");
@@ -619,29 +900,29 @@
 
     function hitBeat(event) {
       if (event.target.closest(".accent")) return null;
-      const nodes = dotNodes();
-      if (!nodes.length) return null;
-      const boxes = nodes.map((node) => ({ beat: Number(node.dataset.beat), box: node.getBoundingClientRect() }));
-      const top = Math.min(...boxes.map((item) => item.box.top));
-      const bottom = Math.max(...boxes.map((item) => item.box.bottom));
-      if (event.clientY < top || event.clientY > bottom) return null;
-
-      const byBeat = [[], [], [], []];
-      boxes.forEach((item) => byBeat[item.beat].push(item.box));
-
-      for (let b = 0; b < 4; b++) {
-        if (!byBeat[b].length) continue;
-        const left = Math.min(...byBeat[b].map((box) => box.left));
-        const ownRight = Math.max(...byBeat[b].map((box) => box.right));
-        let right = ownRight;
-        for (let n = b + 1; n < 4; n++) {
-          if (byBeat[n].length) {
-            right = Math.min(...byBeat[n].map((box) => box.left));
-            break;
-          }
-        }
-        if (event.clientX >= left && event.clientX < right) return b;
-        if (b === 3 && event.clientX >= left && event.clientX <= ownRight) return b;
+      const groups = [...dotsBox.querySelectorAll(".beat-group")];
+      if (!groups.length) return null;
+      const items = groups.map((el) => {
+        const slots = el.querySelector(".beat-slots") || el;
+        return { beat: Number(el.dataset.beat), box: slots.getBoundingClientRect() };
+      });
+      const containing = items.filter((item) =>
+        event.clientY >= item.box.top && event.clientY <= item.box.bottom
+      );
+      if (!containing.length) return null;
+      const nearest = containing.reduce((best, item) => {
+        const mid = (item.box.top + item.box.bottom) / 2;
+        const bestMid = (best.box.top + best.box.bottom) / 2;
+        return Math.abs(mid - event.clientY) < Math.abs(bestMid - event.clientY) ? item : best;
+      });
+      const row = items.filter((item) => Math.abs(item.box.top - nearest.box.top) < 12);
+      row.sort((a, b) => a.box.left - b.box.left);
+      for (let i = 0; i < row.length; i++) {
+        const left = row[i].box.left;
+        const ownRight = row[i].box.right;
+        const right = i + 1 < row.length ? row[i + 1].box.left : ownRight;
+        if (event.clientX >= left && event.clientX < right) return row[i].beat;
+        if (i === row.length - 1 && event.clientX >= left && event.clientX <= ownRight) return row[i].beat;
       }
       return null;
     }
@@ -649,8 +930,14 @@
     function renderDots() {
       dotsBox.innerHTML = "";
       const g = displayedGrid();
-      for (let b = 0; b < 4; b++) {
-        const n = extraDots ? shownBeatSub(b, g) : 1;
+      for (let b = 0; b < shownBeats; b++) {
+        const group = document.createElement("div");
+        group.className = "beat-group";
+        group.dataset.beat = String(b);
+        const slots = document.createElement("div");
+        slots.className = "beat-slots";
+        const n = slotsOnBeat(b, g);
+        const tuplet = !isAlteredShown(b) && (shownBeatSub(b, g) === 3 || shownBeatSub(b, g) === 5);
         for (let s = 0; s < n; s++) {
           const slot = document.createElement("div");
           slot.className = "slot";
@@ -673,7 +960,13 @@
           }
           const el = document.createElement("button");
           el.type = "button";
-          el.className = "dot" + (s === 0 ? "" : " small");
+          const mark = shownUnit(b) === 3 ? "+" : shownUnit(b) === 1 ? "-" : "";
+          const showMark = mark && s === 0;
+          el.className = "dot" + (s === 0 ? "" : " small") + (showMark ? " unit-mark" : "");
+          if (showMark) {
+            const path = mark === "+" ? "M12 5v14M5 12h14" : "M5 12h14";
+            el.innerHTML = '<svg class="unit-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="' + path + '" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>';
+          }
           el.dataset.beat = String(b);
           el.dataset.slot = String(s);
           el.setAttribute("aria-label", slotOn(g, b, extraDots ? s : 0) ? "mute slot" : "unmute slot");
@@ -683,11 +976,20 @@
             el.blur();
           };
           slot.appendChild(el);
-          dotsBox.appendChild(slot);
+          slots.appendChild(slot);
         }
+        group.appendChild(slots);
+        if (tuplet) {
+          const br = document.createElement("div");
+          br.className = "tuplet-bracket";
+          br.setAttribute("aria-hidden", "true");
+          group.appendChild(br);
+        }
+        dotsBox.appendChild(group);
       }
       const beatIndex = playing ? soundedBeatIndex : 0;
-      paintDots(holdBeat !== null ? flatIndex(beatIndex, 0) : Math.min(litIndex, dotNodes().length - 1));
+      if (playing && beatIndex >= shownBeats) paintDots(-1);
+      else paintDots(holdBeat !== null ? flatIndex(beatIndex, 0) : Math.min(litIndex, dotNodes().length - 1));
     }
 
     function updateSubdivButtons() {
@@ -767,41 +1069,51 @@
         localStorage.setItem(SWING_KEY, displayedSwing() ? "1" : "0");
         localStorage.setItem(DOTS_KEY, extraDots ? "1" : "0");
         localStorage.setItem(SOUND_KEY, soundPreset);
+        localStorage.setItem(BEATS_KEY, String(shownBeats));
+        localStorage.setItem(UNIT_KEY, JSON.stringify(gridUnits.map((u, i) => pendingUnits[i] != null ? pendingUnits[i] : u)));
         localStorage.setItem(TRAIN_KEY, JSON.stringify({
           on: trainerOn, start: trainStart, target: trainTarget, bars: trainBars, step: trainStep
         }));
       } catch (error) {}
     }
 
-    function loadAccents(raw) {
+    function loadAccents(raw, n) {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length === 4) return parsed.map(Boolean);
+        if (Array.isArray(parsed) && parsed.length) {
+          const next = parsed.map(Boolean);
+          while (next.length < n) next.push(true);
+          return next;
+        }
       } catch (error) {}
-      return defaultAccents();
+      return defaultAccents(n);
     }
 
-    function loadGridSubs(raw) {
-      const next = defaultSubs();
+    function loadGridSubs(raw, n) {
+      const next = defaultSubs(n);
       try {
         const parsed = JSON.parse(raw);
         for (const g of SUB_CHOICES) {
-          if (Array.isArray(parsed && parsed[g]) && parsed[g].length === 4) {
-            next[g] = parsed[g].map((n) => SUB_CHOICES.includes(Number(n)) ? Number(n) : g);
+          if (Array.isArray(parsed && parsed[g]) && parsed[g].length) {
+            const row = parsed[g].map((v) => SUB_CHOICES.includes(Number(v)) ? Number(v) : g);
+            while (row.length < n) row.push(g);
+            next[g] = row;
           }
         }
       } catch (error) {}
       return next;
     }
 
-    function loadGridMutes(rawGrid, rawOld) {
-      const next = defaultMutes();
+    function loadGridMutes(rawGrid, rawOld, n) {
+      const next = defaultMutes(n);
       try {
         const parsed = rawGrid ? JSON.parse(rawGrid) : null;
         if (parsed) {
           for (const g of SUB_CHOICES) {
-            if (Array.isArray(parsed[g]) && parsed[g].length === 4) {
-              next[g] = parsed[g].map((row, b) => resizeMuteRow(row, gridSubs[g][b]));
+            if (Array.isArray(parsed[g]) && parsed[g].length) {
+              const rows = parsed[g].map((row, b) => resizeMuteRow(row, (gridSubs[g] && gridSubs[g][b]) || g));
+              while (rows.length < n) rows.push(Array(g).fill(true));
+              next[g] = rows;
             }
           }
           return next;
@@ -812,7 +1124,10 @@
         if (old) {
           for (const g of SUB_CHOICES) {
             if (Array.isArray(old[g]) && old[g].length === 4 * g) {
-              next[g] = [0, 1, 2, 3].map((b) => old[g].slice(b * g, b * g + g).map(Boolean));
+              next[g] = Array.from({ length: n }, (_, b) => {
+                if (b < 4) return old[g].slice(b * g, b * g + g).map(Boolean);
+                return Array(g).fill(true);
+              });
             }
           }
         }
@@ -881,9 +1196,20 @@
         gridSwing = pendingSwing;
         pendingSwing = null;
       }
+      if (pendingUnits[beat] != null) {
+        gridUnits[beat] = pendingUnits[beat];
+        pendingUnits[beat] = null;
+      }
     }
 
     function tickDuration() {
+      if (isAlteredLive(beat)) {
+        const eighth = (60 / gridBpm) / 2;
+        const u = liveUnit(beat);
+        if (currentGrid === 1) return eighth * u;
+        if (currentGrid === 4) return eighth / 2;
+        return eighth;
+      }
       const beatDur = 60 / gridBpm;
       const n = liveBeatSub(beat);
       if (!gridSwing || n === 1 || n === 3 || n === 5) return beatDur / n;
@@ -892,22 +1218,24 @@
     }
 
     function heardBeatEnd() {
-      const beatDur = 60 / gridBpm;
       const now = audioCtx ? audioCtx.currentTime : 0;
-      let t = (schedBeatStart || nextNoteTime) + beatDur;
-      while (t <= now + 0.01) t += beatDur;
+      let t = (schedBeatStart || nextNoteTime) + beatLength(schedBeatIndex);
+      let b = (schedBeatIndex + 1) % beatsPerBar;
+      while (t <= now + 0.01) {
+        t += beatLength(b);
+        b = (b + 1) % beatsPerBar;
+      }
       return t;
     }
 
     function upcomingBeatStart(beatIndex) {
       if (!playing || !audioCtx) return null;
       if (beatIndex === soundedBeatIndex) return null;
-      const beatDur = 60 / gridBpm;
-      let start = soundedBeatStart + beatDur;
-      let b = (soundedBeatIndex + 1) % 4;
+      let start = soundedBeatStart + beatLength(soundedBeatIndex);
+      let b = (soundedBeatIndex + 1) % beatsPerBar;
       while (b !== beatIndex) {
-        start += beatDur;
-        b = (b + 1) % 4;
+        start += beatLength(b);
+        b = (b + 1) % beatsPerBar;
       }
       return start;
     }
@@ -932,7 +1260,7 @@
       if (crossed) {
         nextNoteTime = end;
         sub = 0;
-        beat = (schedBeatIndex + 1) % 4;
+        beat = (schedBeatIndex + 1) % beatsPerBar;
       }
     }
 
@@ -983,7 +1311,30 @@
       setBpm(raw);
     }
 
+    function resetBeatUnit(b) {
+      if (shownUnit(b) === 2) return;
+      if (!playing) {
+        gridUnits[b] = 2;
+        pendingUnits[b] = null;
+      } else if (b === soundedBeatIndex) {
+        pendingUnits[b] = 2;
+      } else {
+        gridUnits[b] = 2;
+        pendingUnits[b] = null;
+        rescheduleUpcomingBeat(b);
+      }
+    }
+
+    function clearGridPattern(g) {
+      const n = Math.max(shownBeats, beatsPerBar, gridUnits.length);
+      gridSubs[g] = Array.from({ length: n }, () => g);
+      pendingGridSubs[g] = Array.from({ length: n }, () => null);
+      gridMutes[g] = Array.from({ length: n }, () => Array(g).fill(true));
+    }
+
     function setSubdiv(value) {
+      clearGridPattern(value);
+      for (let b = 0; b < gridUnits.length; b++) resetBeatUnit(b);
       if (!playing) {
         currentGrid = value;
         pendingGrid = null;
@@ -1000,12 +1351,12 @@
     }
 
     function setBeatSubdiv(beatIndex, value) {
+      if (value === 3 || value === 5) resetBeatUnit(beatIndex);
       const g = displayedGrid();
       if (playing && g === currentGrid && beatIndex === soundedBeatIndex && soundingMutes[beatIndex] === null) {
         const liveRow = gridMutes[g] && gridMutes[g][beatIndex];
         soundingMutes[beatIndex] = Array.isArray(liveRow) ? liveRow.slice() : Array(liveBeatSub(beatIndex)).fill(true);
       }
-      gridMutes[g][beatIndex] = Array(value).fill(true);
       if (!playing || g !== currentGrid) {
         applyBeatSub(g, beatIndex, value);
         pendingGridSubs[g][beatIndex] = null;
@@ -1018,6 +1369,7 @@
         pendingGridSubs[g][beatIndex] = null;
         rescheduleUpcomingBeat(beatIndex);
       }
+      gridMutes[g][beatIndex] = resizeMuteRow([], muteLen(beatIndex, g));
       renderDots();
       saveState();
     }
@@ -1269,14 +1621,20 @@
     function nextTick() {
       nextNoteTime += tickDuration();
       sub += 1;
-      if (sub >= liveBeatSub(beat)) {
+      if (sub >= liveSlots(beat)) {
         soundingMutes[beat] = null;
         sub = 0;
-        beat = (beat + 1) % 4;
+        beat += 1;
+        applyBeatsAtAdvance();
+        if (beat >= beatsPerBar) beat = 0;
       }
     }
 
     function lightForClick(thisBeat, thisSub) {
+      if (thisBeat >= shownBeats) {
+        paintDots(-1);
+        return;
+      }
       if (holdBeat !== null && thisSub !== 0 && thisBeat === holdBeat) {
         paintDots(flatIndex(thisBeat, 0));
         return;
@@ -1339,8 +1697,10 @@
         }
 
         const delay = Math.max(0, (time - audioCtx.currentTime) * 1000);
+        const lightEpoch = meterEpoch;
         setTimeout(() => {
           if (!playing || currentRunId !== runId) return;
+          if (lightEpoch !== meterEpoch && thisBeat !== soundedBeatIndex) return;
           if (thisSub === 0) {
             soundedBeatStart = time;
             soundedBeatIndex = thisBeat;
@@ -1398,7 +1758,7 @@
       sub = 0;
       litIndex = 0;
       holdBeat = null;
-      soundingMutes = [null, null, null, null];
+      soundingMutes = Array.from({ length: beatsPerBar }, () => null);
       gridBpm = bpm;
       applyPending();
       changeQueued = false;
@@ -1433,14 +1793,20 @@
       sub = 0;
       litIndex = 0;
       holdBeat = null;
-      soundingMutes = [null, null, null, null];
+      soundingMutes = Array.from({ length: shownBeats }, () => null);
       applyPending();
+      if (pendingBeats !== null) {
+        beatsPerBar = pendingBeats;
+        pendingBeats = null;
+        resizeToBeats(beatsPerBar);
+        showBeats(beatsPerBar);
+      }
       if (pendingGrid !== null) {
         currentGrid = pendingGrid;
         pendingGrid = null;
       }
       for (const g of SUB_CHOICES) {
-        for (let b = 0; b < 4; b++) {
+        for (let b = 0; b < shownBeats; b++) {
           if (pendingGridSubs[g][b] !== null) {
             applyBeatSub(g, b, pendingGridSubs[g][b]);
             pendingGridSubs[g][b] = null;
@@ -1485,6 +1851,30 @@
       };
       subMenu.appendChild(copy);
     });
+    const plus = document.createElement("button");
+    plus.type = "button";
+    plus.dataset.plus = "1";
+    plus.textContent = "+";
+    plus.setAttribute("aria-label", "add eighth");
+    plus.title = "2 / 3 eighths";
+    plus.onclick = () => {
+      nudgeUnit(menuBeat, 1);
+      hideSubMenu();
+      plus.blur();
+    };
+    subMenu.appendChild(plus);
+    const minus = document.createElement("button");
+    minus.type = "button";
+    minus.dataset.minus = "1";
+    minus.textContent = "−";
+    minus.setAttribute("aria-label", "remove eighth");
+    minus.title = "shorter beat";
+    minus.onclick = () => {
+      nudgeUnit(menuBeat, -1);
+      hideSubMenu();
+      minus.blur();
+    };
+    subMenu.appendChild(minus);
 
     bindTap(playBtn, togglePlay);
     bindTap(document.getElementById("minus4"), () => setBpm(bpm - 4));
@@ -1499,12 +1889,13 @@
     bindTap(swingBtn, setSwing);
     bindTap(trainerBtn, toggleTrainer);
     bindTap(dotsToggle, toggleExtraDots);
-    bindTap(muteReset, resetMutes);
-    bindTap(subsReset, resetSubs);
-    bindTap(accentReset, resetAccents);
+    bindTap(patternReset, resetPattern);
     bindTap(accentOneBtn, toggleAccentOne);
     soundSel.onchange = (e) => setSound(e.target.value);
     slider.oninput = (e) => { if (!trainerRunning) setBpm(e.target.value); };
+    beatBtns.forEach((btn) => {
+      bindTap(btn, () => setBeats(Number(btn.dataset.beats)));
+    });
     [trainStartEl, trainTargetEl, trainBarsEl, trainStepEl].forEach((el) => {
       el.addEventListener("change", readTrainerFields);
       el.addEventListener("blur", readTrainerFields);
@@ -1587,9 +1978,25 @@
       const savedSound = localStorage.getItem(SOUND_KEY);
       const savedTrain = localStorage.getItem(TRAIN_KEY);
       extraDots = savedDots === "1";
-      gridSubs = loadGridSubs(savedGridSubs);
-      gridMutes = loadGridMutes(savedGridMutes, savedMutes);
-      accents = loadAccents(savedAccents);
+      const savedBeats = clamp(localStorage.getItem(BEATS_KEY) || 4, MIN_BEATS, MAX_BEATS);
+      beatsPerBar = savedBeats;
+      shownBeats = savedBeats;
+      pendingBeats = null;
+      showBeats(savedBeats);
+      try {
+        const rawU = localStorage.getItem(UNIT_KEY);
+        const parsedU = rawU ? JSON.parse(rawU) : null;
+        if (Array.isArray(parsedU)) {
+          parsedU.forEach((u, i) => {
+            if (i < MAX_BEATS) gridUnits[i] = clampUnit(u);
+          });
+        }
+      } catch (error) {}
+      pendingUnits = Array.from({ length: MAX_BEATS }, () => null);
+      gridSubs = loadGridSubs(savedGridSubs, MAX_BEATS);
+      gridMutes = loadGridMutes(savedGridMutes, savedMutes, MAX_BEATS);
+      accents = loadAccents(savedAccents, MAX_BEATS);
+      resizeToBeats(MAX_BEATS);
       accentOne = localStorage.getItem(ACCENT_ONE_KEY) !== "0";
       soundPreset = loadSound(savedSound);
       soundSel.value = soundPreset;
@@ -1625,6 +2032,7 @@
       }
     } catch (error) {
       setBpm(60);
+      setBeats(4);
       updateSubdivButtons();
       updateDotsToggle();
       updateTrainerButton();
