@@ -352,15 +352,15 @@
   </div>
   <div class="trainer-box">
     <button type="button" class="trainer-toggle" id="trainerBtn" aria-pressed="false">trainer</button>
-    <label>start bpm <input id="trainStart" type="number" min="40" max="300" value="60" inputmode="numeric"></label>
-    <label>target bpm <input id="trainTarget" type="number" min="40" max="300" value="100" inputmode="numeric"></label>
+    <label>start bpm <input id="trainStart" type="number" min="30" max="300" value="60" inputmode="numeric"></label>
+    <label>target bpm <input id="trainTarget" type="number" min="30" max="300" value="100" inputmode="numeric"></label>
     <label>bar interval <input id="trainBars" type="number" min="1" max="64" value="8" inputmode="numeric"></label>
     <label>± bpm <input id="trainStep" type="number" min="1" max="32" value="4" inputmode="numeric"></label>
     <div class="trainer-status" id="trainStatus" aria-live="polite" aria-atomic="true">&nbsp;</div>
   </div>
   <div id="subMenu" class="sub-menu" hidden role="menu" aria-label="beat subdivision"></div>
   <div class="wrap">
-    <input class="bpm" id="bpmText" type="number" min="40" max="300" value="60" inputmode="numeric" autocomplete="off" aria-label="tempo in bpm" />
+    <input class="bpm" id="bpmText" type="number" min="30" max="300" value="60" inputmode="numeric" autocomplete="off" aria-label="tempo in bpm" />
     <div class="dots" id="dots"></div>
     <div class="row">
       <div class="btn-group tempo-group" role="group" aria-label="tempo">
@@ -431,7 +431,7 @@
       </div>
       <button type="button" class="swing-btn" id="swing" aria-pressed="false">swing</button>
     </div>
-    <input id="slider" type="range" min="40" max="300" value="60" autocomplete="off" aria-label="tempo slider" />
+    <input id="slider" type="range" min="30" max="300" value="60" autocomplete="off" aria-label="tempo slider" />
     <div class="row" style="margin-top:22px">
       <button type="button" class="play" id="play">play</button>
     </div>
@@ -1129,7 +1129,7 @@
 
     function loadBpm(raw) {
       const n = Number(raw);
-      if (!Number.isFinite(n) || n < 40 || n > 300) return 60;
+      if (!Number.isFinite(n) || n < 30 || n > 300) return 60;
       return Math.round(n);
     }
 
@@ -1277,7 +1277,7 @@
 
     function setBpm(v) {
       if (trainerRunning) return;
-      const next = Math.min(300, Math.max(40, Math.round(Number(v))));
+      const next = Math.min(300, Math.max(30, Math.round(Number(v))));
       bpm = Number.isFinite(next) ? next : 60;
       showBpm(bpm);
       if (!playing) {
@@ -1442,8 +1442,8 @@
 
     function readTrainerFields() {
       if (!trainerRunning) {
-        trainStart = clamp(trainStartEl.value, 40, 300);
-        trainTarget = clamp(trainTargetEl.value, 40, 300);
+        trainStart = clamp(trainStartEl.value, 30, 300);
+        trainTarget = clamp(trainTargetEl.value, 30, 300);
       }
       trainBars = clamp(trainBarsEl.value, 1, 64);
       trainStep = clamp(trainStepEl.value, 1, 32);
@@ -2000,8 +2000,8 @@
       soundSel.value = soundPreset;
       if (savedTrain) {
         const t = JSON.parse(savedTrain);
-        trainStart = clamp(t.start, 40, 300);
-        trainTarget = clamp(t.target, 40, 300);
+        trainStart = clamp(t.start, 30, 300);
+        trainTarget = clamp(t.target, 30, 300);
         trainBars = clamp(t.bars, 1, 64);
         trainStep = clamp(t.step, 1, 32);
         trainerOn = !!t.on;
