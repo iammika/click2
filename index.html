@@ -21,6 +21,18 @@
       color:#2ec4d6;
       line-height:1;
     }
+    .count {
+      position:fixed;
+      top:22px;
+      right:22px;
+      margin:0;
+      font-size:14px;
+      font-weight:600;
+      color:#aaa;
+      letter-spacing:0.02em;
+      font-variant-numeric:tabular-nums;
+      white-space:nowrap;
+    }
     .bpm {
       font-size:92px;
       font-weight:700;
@@ -273,7 +285,7 @@
     }
     .beats-box button:last-child { box-shadow:none; }
     .beats-box button.active { background:#2ec4d6; color:#111; }
-    .dots-toggle, .mute-reset, .subs-reset, .accent-reset {
+    .dots-toggle, .mute-reset, .accent-reset {
       font-size:13px;
       padding:8px 12px;
       border-radius:999px;
@@ -316,6 +328,7 @@
 </head>
 <body>
   <h1 class="logo">click2</h1>
+  <p class="count" id="count">beat 0 | bar 0</p>
   <div class="beats-box" id="beatsBox" role="group" aria-label="beats in a bar">
     <button type="button" data-beats="2">2</button>
     <button type="button" data-beats="3">3</button>
@@ -437,7 +450,6 @@
     const GRID_SUB_KEY = "click-metronome-grid-subs";
     const SWING_KEY = "click-metronome-swing";
     const DOTS_KEY = "click-metronome-extra-dots";
-    const MUTE_KEY = "click-metronome-mutes";
     const MUTE_GRID_KEY = "click-metronome-grid-mutes";
     const ACCENT_KEY = "click-metronome-accents";
     const ACCENT_ONE_KEY = "click-metronome-accent-one";
@@ -503,6 +515,7 @@
         btn.classList.toggle("active", on);
         btn.setAttribute("aria-pressed", on ? "true" : "false");
       });
+      updateCount();
     }
 
     function applyBeatsAtAdvance() {
@@ -584,6 +597,13 @@
     let sub = 0;
     let soundedBeatStart = 0;
     let soundedBeatIndex = 0;
+    let heardBeats = 0;
+
+    function updateCount() {
+      const per = Math.max(1, beatsPerBar);
+      const bars = heardBeats === 0 ? 0 : Math.ceil(heardBeats / per);
+      countEl.textContent = "beat " + heardBeats + " | bar " + bars;
+    }
     let schedBeatStart = 0;
     let schedBeatIndex = 0;
     let litIndex = 0;
@@ -615,6 +635,7 @@
     const trainBarsEl = document.getElementById("trainBars");
     const trainStepEl = document.getElementById("trainStep");
     const trainStatus = document.getElementById("trainStatus");
+    const countEl = document.getElementById("count");
     const beatBtns = [...document.querySelectorAll("#beatsBox button")];
     const tempoBtns = [
       document.getElementById("minus4"),
@@ -654,9 +675,6 @@
       if (pendingUnits[b] != null && b !== soundedBeatIndex) return clampUnit(pendingUnits[b]);
       return clampUnit(gridUnits[b]);
     }
-
-    function isAlteredShown(b) { return shownUnit(b) !== 2; }
-    function isAlteredLive(b) { return liveUnit(b) !== 2; }
 
     function slotsOnBeat(b, grid) {
       const g = grid || displayedGrid();
@@ -760,12 +778,6 @@
       saveState();
     }
 
-    function resetAccents() {
-      accents = defaultAccents(shownBeats);
-      renderDots();
-      saveState();
-    }
-
     function updateAccentOne() {
       accentOneBtn.classList.toggle("active", accentOne);
       accentOneBtn.setAttribute("aria-pressed", accentOne ? "true" : "false");
@@ -781,18 +793,6 @@
       gridSubs[grid][beatIndex] = value;
       gridMutes[grid][beatIndex] = resizeMuteRow(gridMutes[grid][beatIndex], value);
       soundingMutes[beatIndex] = null;
-    }
-
-    function resetMutes() {
-      gridMutes = defaultMutes(shownBeats);
-      soundingMutes = Array.from({ length: shownBeats }, () => null);
-      for (const g of SUB_CHOICES) {
-        for (let b = 0; b < shownBeats; b++) {
-          gridMutes[g][b] = resizeMuteRow([], shownBeatSub(b, g));
-        }
-      }
-      renderDots();
-      saveState();
     }
 
     function resetSubs() {
@@ -826,7 +826,8 @@
 
     function resetPattern() {
       resetSubs();
-      resetAccents();
+      accents = defaultAccents(shownBeats);
+      renderDots();
     }
 
     function flatIndex(thisBeat, thisSub) {
@@ -937,7 +938,7 @@
         const slots = document.createElement("div");
         slots.className = "beat-slots";
         const n = slotsOnBeat(b, g);
-        const tuplet = !isAlteredShown(b) && (shownBeatSub(b, g) === 3 || shownBeatSub(b, g) === 5);
+        const tuplet = shownUnit(b) === 2 && (shownBeatSub(b, g) === 3 || shownBeatSub(b, g) === 5);
         for (let s = 0; s < n; s++) {
           const slot = document.createElement("div");
           slot.className = "slot";
@@ -1104,31 +1105,16 @@
       return next;
     }
 
-    function loadGridMutes(rawGrid, rawOld, n) {
+    function loadGridMutes(raw, n) {
       const next = defaultMutes(n);
       try {
-        const parsed = rawGrid ? JSON.parse(rawGrid) : null;
-        if (parsed) {
-          for (const g of SUB_CHOICES) {
-            if (Array.isArray(parsed[g]) && parsed[g].length) {
-              const rows = parsed[g].map((row, b) => resizeMuteRow(row, (gridSubs[g] && gridSubs[g][b]) || g));
-              while (rows.length < n) rows.push(Array(g).fill(true));
-              next[g] = rows;
-            }
-          }
-          return next;
-        }
-      } catch (error) {}
-      try {
-        const old = rawOld ? JSON.parse(rawOld) : null;
-        if (old) {
-          for (const g of SUB_CHOICES) {
-            if (Array.isArray(old[g]) && old[g].length === 4 * g) {
-              next[g] = Array.from({ length: n }, (_, b) => {
-                if (b < 4) return old[g].slice(b * g, b * g + g).map(Boolean);
-                return Array(g).fill(true);
-              });
-            }
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (!parsed) return next;
+        for (const g of SUB_CHOICES) {
+          if (Array.isArray(parsed[g]) && parsed[g].length) {
+            const rows = parsed[g].map((row, b) => resizeMuteRow(row, (gridSubs[g] && gridSubs[g][b]) || g));
+            while (rows.length < n) rows.push(Array(g).fill(true));
+            next[g] = rows;
           }
         }
       } catch (error) {}
@@ -1203,11 +1189,18 @@
     }
 
     function tickDuration() {
-      if (isAlteredLive(beat)) {
+      if (liveUnit(beat) !== 2) {
         const eighth = (60 / gridBpm) / 2;
         const u = liveUnit(beat);
-        if (currentGrid === 1) return eighth * u;
-        if (currentGrid === 4) return eighth / 2;
+        const subKind = liveBeatSub(beat);
+        if (subKind === 1) return eighth * u;
+        if (subKind === 4) {
+          if (!gridSwing) return eighth / 2;
+          return (sub % 2 === 0) ? eighth * 2 / 3 : eighth / 3;
+        }
+        if (!gridSwing || subKind !== 2) return eighth;
+        if (sub === 0) return eighth * 4 / 3;
+        if (sub === 1) return eighth * 2 / 3;
         return eighth;
       }
       const beatDur = 60 / gridBpm;
@@ -1705,6 +1698,8 @@
             soundedBeatStart = time;
             soundedBeatIndex = thisBeat;
             changeQueued = false;
+            heardBeats += 1;
+            updateCount();
           }
           if (trainerSnap && trainerSnap.applyBpm !== null && thisBeat === 0 && thisSub === 0) {
             applyHeardTrainerBpm(trainerSnap.applyBpm, time);
@@ -1769,6 +1764,8 @@
       schedBeatIndex = 0;
       soundedBeatStart = nextNoteTime;
       soundedBeatIndex = 0;
+      heardBeats = 0;
+      updateCount();
       renderDots();
       playBtn.textContent = "stop";
       playBtn.classList.add("stop");
@@ -1793,6 +1790,8 @@
       sub = 0;
       litIndex = 0;
       holdBeat = null;
+      heardBeats = 0;
+      updateCount();
       soundingMutes = Array.from({ length: shownBeats }, () => null);
       applyPending();
       if (pendingBeats !== null) {
@@ -1972,7 +1971,6 @@
       const savedGridSubs = localStorage.getItem(GRID_SUB_KEY);
       const savedSwing = localStorage.getItem(SWING_KEY);
       const savedDots = localStorage.getItem(DOTS_KEY);
-      const savedMutes = localStorage.getItem(MUTE_KEY);
       const savedGridMutes = localStorage.getItem(MUTE_GRID_KEY);
       const savedAccents = localStorage.getItem(ACCENT_KEY);
       const savedSound = localStorage.getItem(SOUND_KEY);
@@ -1994,7 +1992,7 @@
       } catch (error) {}
       pendingUnits = Array.from({ length: MAX_BEATS }, () => null);
       gridSubs = loadGridSubs(savedGridSubs, MAX_BEATS);
-      gridMutes = loadGridMutes(savedGridMutes, savedMutes, MAX_BEATS);
+      gridMutes = loadGridMutes(savedGridMutes, MAX_BEATS);
       accents = loadAccents(savedAccents, MAX_BEATS);
       resizeToBeats(MAX_BEATS);
       accentOne = localStorage.getItem(ACCENT_ONE_KEY) !== "0";
